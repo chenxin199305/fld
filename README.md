@@ -49,11 +49,18 @@ demonstrates its representation and generation capability with a robotic motion 
 
 ## Configuration
 
-- The workflow consists of two main stages: motion representation and motion learning. In the first stage, the motion data is represented in the latent space using FLD. In the second stage, the latent space is used to train a policy for the robot.
-- The provided code examplifies the training of FLD with human motion data retargeted to MIT Humanoid. The dataset of [9 different motions](https://youtu.be/MVkg18c5aaU) is stored under `resources/robots/mit_humanoid/datasets/misc`. 10 trajectories
-  of 240 frames for each motion are stored in a separate `.pt` file with the format `motion_data_<motion_name>.pt`. The state dimension indices are specified in `reference_state_idx_dict.json` under `resources/robots/mit_humanoid/datasets/misc`.
-- The MIT Humanoid environment is defined by an env file `mit_humanoid.py` and a config file `mit_humanoid_config.py` under `humanoid_gym/envs/mit_humanoid/`. The config file sets both the environment parameters in class `MITHumanoidFlatCfg` and the
-  training parameters in class `MITHumanoidFlatCfgPPO`.
+- The workflow consists of two main stages:
+    - motion representation and motion learning.
+    - In the first stage, the motion data is represented in the latent space using FLD.
+    - In the second stage, the latent space is used to train a policy for the robot.
+- The provided code examplifies the training of FLD with human motion data retargeted to MIT Humanoid.
+    - The dataset of [9 different motions](https://youtu.be/MVkg18c5aaU) is stored under `resources/robots/mit_humanoid/datasets/misc`.
+    - 10 trajectories of 240 frames for each motion are stored in a separate `.pt` file with the format `motion_data_<motion_name>.pt`.
+    - The state dimension indices are specified in `reference_state_idx_dict.json` under `resources/robots/mit_humanoid/datasets/misc`.
+- The MIT Humanoid environment is defined by an env file `mit_humanoid.py` and
+  a config file `mit_humanoid_config.py` under `humanoid_gym/envs/mit_humanoid/`.
+  The config file sets both the environment parameters in class `MITHumanoidFlatCfg` and
+  the training parameters in class `MITHumanoidFlatCfgPPO`.
 
 ## Usage
 
@@ -63,15 +70,21 @@ demonstrates its representation and generation capability with a robotic motion 
 python scripts/fld/experiment.py
 ```
 
-- `history_horizon` denotes the window size of the input data. A good practice is to set it such that it contains at least one period of the motion.
-- `forecast_horizon` denotes the number of future steps to predict while maintaining the quasi-constant latent parameterization. For motions with high aperiodicity, this value should be set small. It falls back to PAE when `forecast_horizon` is set
-  to 1.
-- The training process is visualized by inspecting the Tensorboard logs at `logs/<experiment_name>/fld/misc/`. The figures include the FLD loss, the reconstruction of sampled trajectories for each motion, the latent parameters in each latent channel
-  along sampled trajectories for each motion with the formed latent manifold, and the latent parameter distribution.
+- `history_horizon` denotes the window size of the input data.
+    - A good practice is to set it such that it contains at least one period of the motion.
+- `forecast_horizon` denotes the number of future steps to predict while maintaining the quasi-constant latent parameterization.
+    - For motions with high aperiodicity, this value should be set small.
+    - It falls back to PAE when `forecast_horizon` is set to 1.
+- The training process is visualized by inspecting the Tensorboard logs at `logs/<experiment_name>/fld/misc/`.
+    - The figures include
+        - the FLD loss
+        - the reconstruction of sampled trajectories for each motion
+        - the latent parameters in each latent channel along sampled trajectories for each motion with the formed latent manifold
+        - the latent parameter distribution.
 - The trained FLD model is saved in `logs/<experiment_name>/fld/misc/model_<iteration>.pt`, where `<experiment_name>` is defined in the experiment config.
 - The training process is logged in the same folder. Run `tensorboard --logdir logs/<experiment_name>/fld/misc/ --samples_per_plugin images=100` to visualize the training loss and plots.
-- A `statistics.pt` file is saved in the same folder, containing the mean and standard deviation of the input data and the statistics of the latent parameterization space. This file is used to normalize the input data and to define plotting ranges
-  during policy training.
+- A `statistics.pt` file is saved in the same folder, containing the mean and standard deviation of the input data and the statistics of the latent parameterization space.
+  This file is used to normalize the input data and to define plotting ranges during policy training.
 
 ### FLD Evaluation
 
