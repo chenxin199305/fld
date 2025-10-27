@@ -1,7 +1,8 @@
 # FLD with MIT Humanoid
 
-This repository provides the [Fourier Latent Dynamics (FLD)](https://arxiv.org/abs/2402.13820) algorithm that represents high-dimension, long-horizon, highly nonlinear, period or quasi-period data in a continuously parameterized space. This work
-demonstrates its representation and generation capability with a robotic motion tracking task on [MIT Humanoid](https://spectrum.ieee.org/mit-dynamic-acrobatic-humanoid-robot) using [NVIDIA Isaac Gym](https://developer.nvidia.com/isaac-gym).
+This repository provides the [Fourier Latent Dynamics (FLD)](https://arxiv.org/abs/2402.13820) algorithm that represents high-dimension, long-horizon, highly nonlinear, period or quasi-period data in a continuously parameterized space.
+This work demonstrates its representation and generation capability with a robotic motion tracking task on [MIT Humanoid](https://spectrum.ieee.org/mit-dynamic-acrobatic-humanoid-robot)
+using [NVIDIA Isaac Gym](https://developer.nvidia.com/isaac-gym).
 
 ![fld](fld.png)
 
@@ -92,12 +93,18 @@ python scripts/fld/experiment.py
 python scripts/fld/evaluate.py
 ```
 
-- A `latent_params.pt` file is saved in the same folder, containing the latent parameters of the input data. This file is used to define the input data for policy training with the offline task sampler.
-- A `gmm.pt` file is saved in the same folder, containing the Gaussian Mixture Model (GMM) of the latent parameters. This file is used to define the input data distribution for policy training with the offline gmm task sampler.
-- A set of latent parameters is sampled and reconstructed to the original motion space. The decoded motion is saved in `resources/robots/mit_humanoid/datasets/decoded/motion_data.pt`. Figure 1 shows the latent sample and the reconstructed motion
-  trajectory. Figure 2 shows the sampled latent parameters. Figure 3 shows the latent manifold of the sampled trajectory, along with the original ones. Figure 4 shows the GMM of the latent parameters.
-- Note that the motion contains only kinematic and proprioceptive information. For visualization only, the global position and orientation of the robot base are approximated by integrating the velocity information with finite difference. Depending on
-  the finite difference method and the intial states, the global position and orientation may be inaccurate and drift over time.
+- A `latent_params.pt` file is saved in the same folder, containing the latent parameters of the input data.
+    - This file is used to define the input data for policy training with the offline task sampler.
+- A `gmm.pt` file is saved in the same folder, containing the Gaussian Mixture Model (GMM) of the latent parameters.
+    - This file is used to define the input data distribution for policy training with the offline gmm task sampler.
+- A set of latent parameters is sampled and reconstructed to the original motion space. The decoded motion is saved in `resources/robots/mit_humanoid/datasets/decoded/motion_data.pt`.
+    - Figure 1 shows the latent sample and the reconstructed motion trajectory.
+    - Figure 2 shows the sampled latent parameters.
+    - Figure 3 shows the latent manifold of the sampled trajectory, along with the original ones.
+    - Figure 4 shows the GMM of the latent parameters.
+- Note that the motion contains only kinematic and proprioceptive information.
+    - For visualization only, the global position and orientation of the robot base are approximated by integrating the velocity information with finite difference.
+    - Depending on the finite difference method and the intial states, the global position and orientation may be inaccurate and drift over time.
 
 ### Motion Visualization
 
@@ -140,8 +147,8 @@ RuntimeError: nvrtc: error: invalid value for --gpu-architecture (-arch)
 
 ## Known Issues
 
-The `ALPGMMSampler` utilizes [faiss](https://github.com/facebookresearch/faiss) for efficient similarity search and clustering of dense vectors in the latent parameterization space. The installation of `faiss` requires a compatible CUDA version. The
-current implementation is tested with `faiss-cpu` and `faiss-gpu` with `cuda-10.2`.
+The `ALPGMMSampler` utilizes [faiss](https://github.com/facebookresearch/faiss) for efficient similarity search and clustering of dense vectors in the latent parameterization space. 
+The installation of `faiss` requires a compatible CUDA version. The current implementation is tested with `faiss-cpu` and `faiss-gpu` with `cuda-10.2`.
 
 ## Citation
 
