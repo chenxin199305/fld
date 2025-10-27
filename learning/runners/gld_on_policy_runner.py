@@ -51,7 +51,7 @@ class FLDOnPolicyRunner:
         self.enable_classifier = self.env.cfg.task_sampler.classifier.enabled
         if self.task_sampler_class == "OfflineSampler":
             task_sampler = OfflineSampler(self.device)
-            task_sampler.load_data(self.env.cfg.fld.load_root+"/latent_params.pt")
+            task_sampler.load_data(self.env.cfg.fld.load_root + "/latent_params.pt")
         elif self.task_sampler_class == "RandomSampler":
             task_sampler = RandomSampler(
                 self.env.fld_latent_channel * 3,
@@ -65,8 +65,8 @@ class FLDOnPolicyRunner:
                 self.env.fld_latent_channel * 3,
                 device=self.device,
                 curriculum_scale=self.env.cfg.task_sampler.curriculum_scale,
-                )
-            task_sampler.load_gmm(self.env.cfg.fld.load_root+"/gmm.pt")
+            )
+            task_sampler.load_gmm(self.env.cfg.fld.load_root + "/gmm.pt")
         elif self.task_sampler_class == "ALPGMMSampler":
             task_sampler = ALPGMMSampler(
                 self.env.cfg.task_sampler.alp_gmm.init_num_components,
@@ -78,14 +78,14 @@ class FLDOnPolicyRunner:
                 device=self.device,
                 curriculum_scale=self.env.cfg.task_sampler.curriculum_scale,
                 random_type=self.env.cfg.task_sampler.alp_gmm.random_type,
-                )
+            )
             if self.env.cfg.task_sampler.alp_gmm.random_type == "gmm":
-                task_sampler.load_gmm(self.env.cfg.fld.load_root+"/gmm.pt")
+                task_sampler.load_gmm(self.env.cfg.fld.load_root + "/gmm.pt")
         else:
             raise Exception(f"Unknown task sampler class {self.task_sampler_class}")
         if self.enable_classifier:
             self.task_classifier = Discriminator(self.env.fld_latent_channel * 3, self.env.cfg.task_sampler.classifier.num_classes, self.device)
-            self.task_classifier.load_state_dict(torch.load(self.env.cfg.fld.load_root+"/classifier.pt")["classifier_state_dict"])
+            self.task_classifier.load_state_dict(torch.load(self.env.cfg.fld.load_root + "/classifier.pt")["classifier_state_dict"])
             self.task_classifier.eval()
         self.env.task_sampler = task_sampler
         self.task_sampler_update_curriculum_counter = 0
@@ -153,7 +153,7 @@ class FLDOnPolicyRunner:
                         dones.to(self.device),
                     )
                     self.alg.process_env_step(rewards, dones, infos)
-                    
+
                     if self.log_dir is not None:
                         # Book keeping
                         if "episode" in infos:
@@ -190,7 +190,7 @@ class FLDOnPolicyRunner:
             if it % self.save_interval == 0:
                 self.save(os.path.join(self.log_dir, "model_{}.pt".format(it)))
                 self.log_latent_params(it)
-            
+
             self.check_task_sampler_curriculum_update()
             if it % self.env.cfg.task_sampler.check_update_interval == 0:
                 self.check_task_sampler_update()
@@ -250,7 +250,7 @@ class FLDOnPolicyRunner:
                 f"""{'#' * width}\n"""
                 f"""{str.center(width, ' ')}\n\n"""
                 f"""{'Computation:':>{pad}} {fps:.0f} steps/s (collection: {locs[
-                            'collection_time']:.3f}s, learning {locs['learn_time']:.3f}s)\n"""
+                    'collection_time']:.3f}s, learning {locs['learn_time']:.3f}s)\n"""
                 f"""{'Value function loss:':>{pad}} {locs['mean_value_loss']:.4f}\n"""
                 f"""{'Surrogate loss:':>{pad}} {locs['mean_surrogate_loss']:.4f}\n"""
                 f"""{'Mean action noise std:':>{pad}} {mean_std.item():.2f}\n"""
@@ -264,7 +264,7 @@ class FLDOnPolicyRunner:
                 f"""{'#' * width}\n"""
                 f"""{str.center(width, ' ')}\n\n"""
                 f"""{'Computation:':>{pad}} {fps:.0f} steps/s (collection: {locs[
-                            'collection_time']:.3f}s, learning {locs['learn_time']:.3f}s)\n"""
+                    'collection_time']:.3f}s, learning {locs['learn_time']:.3f}s)\n"""
                 f"""{'Value function loss:':>{pad}} {locs['mean_value_loss']:.4f}\n"""
                 f"""{'Surrogate loss:':>{pad}} {locs['mean_surrogate_loss']:.4f}\n"""
                 f"""{'Mean action noise std:':>{pad}} {mean_std.item():.2f}\n"""
@@ -279,7 +279,7 @@ class FLDOnPolicyRunner:
             f"""{'Iteration time:':>{pad}} {iteration_time:.2f}s\n"""
             f"""{'Total time:':>{pad}} {self.tot_time:.2f}s\n"""
             f"""{'ETA:':>{pad}} {self.tot_time / (locs['it'] + 1) * (
-                               locs['num_learning_iterations'] - locs['it']):.1f}s\n"""
+                    locs['num_learning_iterations'] - locs['it']):.1f}s\n"""
         )
         print(log_string)
 
@@ -297,8 +297,8 @@ class FLDOnPolicyRunner:
 
     def check_task_sampler_curriculum_update(self):
         if self.env.task_sampler_curriculum_flag \
-            and self.task_sampler_update_curriculum_counter < self.env.cfg.task_sampler.max_num_curriculum_updates \
-            and self.task_sampler_update_counter < self.env.cfg.task_sampler.max_num_updates:
+                and self.task_sampler_update_curriculum_counter < self.env.cfg.task_sampler.max_num_curriculum_updates \
+                and self.task_sampler_update_counter < self.env.cfg.task_sampler.max_num_updates:
             self.env.task_sampler.update_curriculum()
             self.env.task_sampler_curriculum_flag = False
             self.task_sampler_update_curriculum_counter += 1
@@ -327,7 +327,6 @@ class FLDOnPolicyRunner:
                 self.task_sampler_update_counter += 1
                 self.task_sampler_update_curriculum_counter = 0
 
-
     def log_latent_params(self, it):
         library_size = self.env.get_library_size()
         task_library, performance_library = self.env.get_libraries()
@@ -343,7 +342,7 @@ class FLDOnPolicyRunner:
             if self.enable_classifier:
                 with torch.no_grad():
                     _, task_classes = self.task_classifier(task_library).max(dim=1)
-                self.plotter.plot_pca_intensity(self.ax2[3], [task_library], [task_classes], cmap='rainbow', vmin=0.0, vmax=self.env.cfg.task_sampler.classifier.num_classes-1, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, title="Class")
+                self.plotter.plot_pca_intensity(self.ax2[3], [task_library], [task_classes], cmap='rainbow', vmin=0.0, vmax=self.env.cfg.task_sampler.classifier.num_classes - 1, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, title="Class")
         self.plotter.plot_histogram(self.ax1[0], performance_library, title="Performance")
         task_library_split = task_library.split(self.env.fld_latent_channel, dim=1)
         latent_param_ymin = [ymin.min() for ymin in self.latent_param_min.split(self.env.fld_latent_channel)]
@@ -393,7 +392,7 @@ class FLDOnPolicyRunner:
                 if self.enable_classifier:
                     with torch.no_grad():
                         _, task_knn_classes = self.task_classifier(task_knn_buffer).max(dim=1)
-                    self.plotter.plot_pca_intensity(self.ax3[1], [task_knn_buffer], [task_knn_classes], cmap='rainbow', vmin=0.0, vmax=self.env.cfg.task_sampler.classifier.num_classes-1, title="Class")
+                    self.plotter.plot_pca_intensity(self.ax3[1], [task_knn_buffer], [task_knn_classes], cmap='rainbow', vmin=0.0, vmax=self.env.cfg.task_sampler.classifier.num_classes - 1, title="Class")
         else:
             raise Exception(f"Unknown task sampler class {self.task_sampler_class}")
         self.plotter.plot_gmm(self.ax0[0], task_library_split[0], mu[0], var[0], ymin=latent_param_ymin[0], ymax=latent_param_ymax[0], title="Frequency GMM")
@@ -403,7 +402,7 @@ class FLDOnPolicyRunner:
         self.writer.add_figure(f"Sampler/library_correlation", self.fig1, it)
         self.writer.add_figure(f"Sampler/library_pca", self.fig2, it)
         self.writer.add_figure(f"Sampler/knn_pca", self.fig3, it)
-        
+
     def load(self, path, load_optimizer=True):
         loaded_dict = torch.load(path)
         self.alg.actor_critic.load_state_dict(loaded_dict["model_state_dict"])

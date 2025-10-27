@@ -4,6 +4,7 @@ from matplotlib.patches import Ellipse
 import matplotlib.colors as mcolors
 from matplotlib.colors import to_rgba
 
+
 class Plotter:
     def __init__(self) -> None:
         self.pca = PCA(n_components=2)
@@ -21,7 +22,7 @@ class Plotter:
 
         num_steps = [len(manifold) for manifold in manifold_collection]
         manifolds = torch.cat(manifold_collection, dim=0).cpu()
-        
+
         manifolds_pca = torch.tensor(self.pca.fit_transform(manifolds)).split(num_steps, dim=0)
 
         for i, manifold in enumerate(manifolds_pca):
@@ -41,7 +42,7 @@ class Plotter:
                         manifold[j + 1, 0] - manifold[j, 0],
                         manifold[j + 1, 1] - manifold[j, 1],
                         alpha=arrow_alpha, width=d * arrow_size, color=arrow_color
-                        )
+                    )
         ax.legend()
         ax.set_axis_off()
         if title != None:
@@ -72,7 +73,7 @@ class Plotter:
             angle = torch.atan2(eigvec_transformed[1, 0], eigvec_transformed[0, 0]) * 180 / torch.pi
             ell = Ellipse(mu_transformed, width * std_scale, height * std_scale, angle=angle, fc=to_rgba(color, 0.2 * alphas[i]), ec=to_rgba(color, alphas[i]), lw=3)
             ax.add_artist(ell)
-    
+
     def plot_pca_intensity(self, ax, manifold_collection, values, cmap='YlOrRd', vmin=0.0, vmax=1.0, xmin=None, xmax=None, ymin=None, ymax=None, title=None):
         ax.cla()
 
@@ -80,12 +81,12 @@ class Plotter:
 
         num_steps = [len(manifold) for manifold in manifold_collection]
         manifolds = torch.cat(manifold_collection, dim=0).cpu()
-        
+
         manifolds_pca = torch.tensor(self.pca.transform(manifolds)).split(num_steps, dim=0)
 
         for i, manifold in enumerate(manifolds_pca):
             ax.scatter(manifold[:, 0], manifold[:, 1], alpha=point_alpha, c=values[i].cpu(), cmap=cmap, vmin=vmin, vmax=vmax)
-    
+
         ax.set_axis_off()
         if title != None:
             ax.set_title(title)
@@ -111,7 +112,7 @@ class Plotter:
         values = values.cpu()
         ax.hist(values, bins=50, density=True)
         ax.set_title(title)
-        ax.yaxis.grid(True)                
+        ax.yaxis.grid(True)
 
     def plot_gmm(self, ax, data, pred_mean, pred_var, color=None, ymin=None, ymax=None, title=None):
         # ax.cla()
@@ -180,7 +181,7 @@ class Plotter:
             x2 = a * torch.sin(theta)
             ax.plot(x1, x2)
             line_x1 = [i + 1, i + 1 + aspect * a * torch.cos(2 * torch.pi * p)]
-            line_x2 = [0.0,  a * torch.sin(2 * torch.pi * p)]
+            line_x2 = [0.0, a * torch.sin(2 * torch.pi * p)]
             ax.plot(line_x1, line_x2, color=(0, 0, 0))
 
         if title != None:
@@ -205,7 +206,7 @@ class Plotter:
         ax.cla()
         phase = phase.cpu()
         amplitude = amplitude.cpu()
-        
+
         phase = torch.where(phase < 0, phase, phase + 1)
         phase = phase % 1.0
         args = torch.arange(phase.size(0))
@@ -216,7 +217,7 @@ class Plotter:
                 [phase[i - 1].item(), phase[i].item()],
                 color=(0.0, 0.0, 0.0),
                 alpha=amplitude[i].item()
-                )
+            )
         ax.set_ylim(0.0, 1.0)
 
         if title != None:
@@ -238,7 +239,7 @@ class Plotter:
         ax.plot(args, phase_x1)
         ax.plot(args, phase_x2)
         ax.set_ylim(-1.0, 1.0)
-        
+
         if title != None:
             ax.set_title(title)
         if show_axes == False:

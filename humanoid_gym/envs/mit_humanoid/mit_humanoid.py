@@ -13,6 +13,7 @@ from learning.modules.fld import FLD
 from typing import Dict
 from humanoid_gym.utils.keyboard_controller import KeyboardAction, Delta, Switch
 
+
 class MITHumanoid(LeggedRobot):
     cfg: MITHumanoidFlatCfg
 
@@ -95,8 +96,8 @@ class MITHumanoid(LeggedRobot):
                 self.projected_gravity,
                 self.dof_pos,
                 self.dof_vel
-                ), dim=1
-            )
+            ), dim=1
+        )
         for key, value in self.decoded_obs_state_idx_dict.items():
             self.fld_state[:, value] = full_state[:, self.fld_state_idx_dict[key]].clone()
         self.fld_observation_buf[:, :-1] = self.fld_observation_buf[:, 1:].clone()
@@ -150,8 +151,8 @@ class MITHumanoid(LeggedRobot):
         self.task_sampler_curriculum_flag = True
         for name in self.tracking_reconstructed_terms:
             self.task_sampler_curriculum_flag &= (torch.mean(self.episode_sums[name][env_ids]) / self.max_episode_length
-            > self.cfg.task_sampler.curriculum_performance_threshold * self.reward_scales[name])
-        
+                                                  > self.cfg.task_sampler.curriculum_performance_threshold * self.reward_scales[name])
+
     def get_fld_latent_param_statistics(self):
         return self.latent_param_max, self.latent_param_min, self.latent_param_mean, self.latent_param_std
 
@@ -201,8 +202,8 @@ class MITHumanoid(LeggedRobot):
                 self.shoulder_abad_indices,
                 self.shoulder_pitch_indices,
                 self.elbow_indices,
-                )
             )
+        )
         self.hip_yaw_indices = torch.tensor([i for i in range(self.num_dof) if "hip_yaw" in self.dof_names[i]], device=self.device, requires_grad=False)
         self.hip_abad_indices = torch.tensor([i for i in range(self.num_dof) if "hip_abad" in self.dof_names[i]], device=self.device, requires_grad=False)
         self.hip_pitch_indices = torch.tensor([i for i in range(self.num_dof) if "hip_pitch" in self.dof_names[i]], device=self.device, requires_grad=False)
@@ -215,8 +216,8 @@ class MITHumanoid(LeggedRobot):
                 self.hip_pitch_indices,
                 self.knee_indices,
                 self.ankle_indices
-                )
             )
+        )
         self.latent_encoding = torch.zeros(self.num_envs, self.cfg.fld.latent_channel, 4, dtype=torch.float, device=self.device, requires_grad=False)
         self.params = torch.zeros(self.num_envs, self.cfg.fld.latent_channel, 4, dtype=torch.float, device=self.device, requires_grad=False)
         self.latent_manifold = torch.zeros(self.num_envs, self.cfg.fld.latent_channel * 2, dtype=torch.float, device=self.device, requires_grad=False)
@@ -243,9 +244,9 @@ class MITHumanoid(LeggedRobot):
             0.5,
             (len(env_ids), self.fld_latent_channel),
             device=self.device,
-            )
+        )
         self.latent_encoding[env_ids, :, 1:] = self.task_sampler.sample(len(env_ids)).view(len(env_ids), 3, self.fld_latent_channel).swapaxes(1, 2)
-    
+
     def get_latent_encoding_from_transitions(self, full_state_transitions):
         state_transitions = (full_state_transitions[:, :, self.fld_dim_of_interest] - self.state_transitions_mean) / self.state_transitions_std
         with torch.no_grad():
@@ -257,18 +258,18 @@ class MITHumanoid(LeggedRobot):
         state_transitions = (full_state_transitions[:, :, self.fld_dim_of_interest] - self.state_transitions_mean) / self.state_transitions_std
         error = self.fld.get_dynamics_error(state_transitions, k)
         return error
-    
+
     def _get_keyboard_events(self) -> Dict[str, KeyboardAction]:
         """Simple keyboard controller for linear and angular velocity."""
 
         def print_selector():
             print(f"latent_variable_selector: {self.latent_variable_selector}")
             print(f"latent_channel_selector: {self.latent_channel_selector}")
-        
+
         def print_command():
             latent_variable = self.latent_variable_list[self.latent_variable_selector]
             print(f"{latent_variable}: {self.latent_encoding[0, :, self.latent_variable_selector]}")
-            
+
         key_board_events = {
             "p": Switch("latent_variable", start_state=-1, toggle_state=0, variable_reference=self.latent_variable_selector, callback=print_selector),
             "f": Switch("latent_variable", start_state=-1, toggle_state=1, variable_reference=self.latent_variable_selector, callback=print_selector),
@@ -322,7 +323,7 @@ class MITHumanoid(LeggedRobot):
         self.extras["episode"] = {}
         for key in self.episode_sums.keys():
             self.extras["episode"]["rew_" + key] = (
-                torch.mean(self.episode_sums[key][env_ids]) / self.max_episode_length_s
+                    torch.mean(self.episode_sums[key][env_ids]) / self.max_episode_length_s
             )
             self.episode_sums[key][env_ids] = 0.0
         # log additional curriculum info
@@ -358,7 +359,7 @@ class MITHumanoid(LeggedRobot):
         latent_param = self.latent_encoding[:, :, 1:].swapaxes(1, 2).flatten(1, 2)
         latent_param += torch.randn_like(latent_param, device=self.device, dtype=torch.float, requires_grad=False) * self.latent_param_std * noise_level
         self.latent_encoding[:, :, 1:] = latent_param.view(self.num_envs, 3, self.fld_latent_channel).swapaxes(1, 2)
-        
+
         phase = self.latent_encoding[:, :, 0]
         frequency = self.latent_encoding[:, :, 1]
         amplitude = self.latent_encoding[:, :, 2]
@@ -372,8 +373,8 @@ class MITHumanoid(LeggedRobot):
             (
                 amplitude * torch.sin(2.0 * torch.pi * phase) + offset,
                 amplitude * torch.cos(2.0 * torch.pi * phase) + offset,
-                )
             )
+        )
 
     def get_latent_params(self):
         fld_observation_buf_standardized = (self.fld_observation_buf - self.state_transitions_mean) / self.state_transitions_std

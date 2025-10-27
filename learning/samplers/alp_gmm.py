@@ -25,13 +25,12 @@ class ALPGMMSampler(BaseSampler):
 
     def load_gmm(self, load_path):
         self.gmm.load_state_dict(torch.load(load_path)["gmm_state_dict"])
-    
+
     def compute_alp(self, task, performance):
         old_performance = self.task_performance_buffer.get_k_nearest_neighbors(task, performance)
         alp = (performance - old_performance).abs()
         return alp
-    
-    
+
     def update(self, task, performance):
         alp = self.compute_alp(task, performance)
         self.task_performance_buffer.insert(task, performance)
@@ -39,15 +38,13 @@ class ALPGMMSampler(BaseSampler):
         self.gmms.fit(x)
         self.gmm_idx.data = self.gmms.get_best_gmm_idx(x)
         self.init_random_sampling.data = torch.tensor(False, device=self.device, dtype=torch.bool)
-    
-    
+
     def update_curriculum(self):
         if self.init_random_sampling:
             pass
         else:
             self.gmms.candidates[self.gmm_idx].set_variances(self.gmms.candidates[self.gmm_idx].var * self.curriculum_scale ** 2)
-        
-    
+
     def sample(self, n_samples, random_ratio=0.2):
         if self.init_random_sampling:
             return (self.max - self.min) * torch.rand(n_samples, self.n_features, device=self.device, dtype=torch.float, requires_grad=False) + self.min
@@ -60,11 +57,9 @@ class ALPGMMSampler(BaseSampler):
         else:
             return self.gmms.sample(n_samples, self.gmm_idx)[:, :-1]
 
-    
     def get_knn_buffer_size(self):
         return self.task_performance_buffer.key_index.ntotal
-    
-    
+
     def get_knn_buffer(self):
         keys, values = self.task_performance_buffer.get_samples(10000)
         return keys, values
@@ -79,13 +74,11 @@ class KNNBuffer:
         self.key_dim = key_dim
         self.value_dim = value_dim
         self.device = device
-         
-    
+
     def insert(self, keys, values):
         self.key_index.add(keys.cpu().numpy())
         self.values = torch.cat((self.values, values), dim=0)
-    
-    
+
     def get_k_nearest_neighbors(self, keys, values, k=1, average=True):
         if self.key_index.ntotal == 0:
             return torch.zeros((keys.size(0), self.value_dim), device=self.device, dtype=torch.float)
@@ -97,8 +90,7 @@ class KNNBuffer:
             return k_nearest_neighbors_values.mean(dim=1)
         else:
             return k_nearest_neighbors_values
-        
-        
+
     def get_samples(self, n_samples):
         if self.key_index.ntotal <= n_samples:
             return torch.tensor(self.key_index.reconstruct_n(0, self.key_index.ntotal), device=self.device, dtype=torch.float, requires_grad=False), self.values

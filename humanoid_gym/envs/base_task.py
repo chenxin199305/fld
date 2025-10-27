@@ -16,12 +16,12 @@ class BaseTask:
     """Base class for RL tasks."""
 
     def __init__(
-        self,
-        cfg: BaseConfig,
-        sim_params: gymapi.SimParams,
-        physics_engine: gymapi.SimType,
-        sim_device: str,
-        headless: bool,
+            self,
+            cfg: BaseConfig,
+            sim_params: gymapi.SimParams,
+            physics_engine: gymapi.SimType,
+            sim_device: str,
+            headless: bool,
     ):
         """Initialize the base class for RL.
 
@@ -154,7 +154,7 @@ class BaseTask:
 
     @abc.abstractmethod
     def step(
-        self, actions: torch.Tensor
+            self, actions: torch.Tensor
     ) -> Tuple[torch.Tensor, Union[torch.Tensor, None], torch.Tensor, torch.Tensor, dict]:
         """Apply input action on the environment.
 

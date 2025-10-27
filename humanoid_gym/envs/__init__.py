@@ -5,7 +5,7 @@
 from .base.legged_robot import LeggedRobot
 from .mit_humanoid.mit_humanoid import MITHumanoid
 from .mit_humanoid.mit_humanoid_config import (
-    MITHumanoidFlatCfg, 
+    MITHumanoidFlatCfg,
     MITHumanoidFlatCfgPPO
 )
 

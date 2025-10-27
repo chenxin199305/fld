@@ -9,6 +9,7 @@ import os
 import json
 import torch
 
+
 class MotionLoader:
 
     def __init__(self, device, motion_file=None, corruption_level=0.0, reference_history_horizon=2, test_mode=False, test_observation_dim=None):
@@ -55,7 +56,7 @@ class MotionLoader:
         )
         for i in range(self.reference_history_horizon):
             self.preloaded_states[:, i] = self._get_frame_at_step(motion_clip_sample_ids, step_sample + i)
-        
+
         if test_mode:
             self.observation_dim = test_observation_dim
 
@@ -92,8 +93,8 @@ class MotionLoader:
             step_ids = step_ids[:num_interpolations].sort()[0]
             interpolated_data[i, step_ids] = self.slerp(data[i, step_ids - 1], data[i, step_ids + 1], 0.5)
             interpolated_data[i, step_ids, self.state_idx_dict["base_quat"][0]:self.state_idx_dict["base_quat"][1]] = self.quaternion_slerp(
-                data[i, step_ids - 1, self.state_idx_dict["base_quat"][0]:self.state_idx_dict["base_quat"][1]], 
-                data[i, step_ids + 1, self.state_idx_dict["base_quat"][0]:self.state_idx_dict["base_quat"][1]], 
+                data[i, step_ids - 1, self.state_idx_dict["base_quat"][0]:self.state_idx_dict["base_quat"][1]],
+                data[i, step_ids + 1, self.state_idx_dict["base_quat"][0]:self.state_idx_dict["base_quat"][1]],
                 0.5
             )
         return interpolated_data
@@ -132,20 +133,20 @@ class MotionLoader:
         blend = (step_sample - step_low).unsqueeze(-1)
         frame = self.slerp(self.data[motion_clip_sample_ids, step_low], self.data[motion_clip_sample_ids, step_high], blend)
         frame[:, self.state_idx_dict["base_quat"][0]:self.state_idx_dict["base_quat"][1]] = self.quaternion_slerp(
-            self.data[motion_clip_sample_ids, step_low, self.state_idx_dict["base_quat"][0]:self.state_idx_dict["base_quat"][1]], 
-            self.data[motion_clip_sample_ids, step_high, self.state_idx_dict["base_quat"][0]:self.state_idx_dict["base_quat"][1]], 
+            self.data[motion_clip_sample_ids, step_low, self.state_idx_dict["base_quat"][0]:self.state_idx_dict["base_quat"][1]],
+            self.data[motion_clip_sample_ids, step_high, self.state_idx_dict["base_quat"][0]:self.state_idx_dict["base_quat"][1]],
             blend
-            )
+        )
         return frame
 
     def get_frames(self, num_frames):
         ids = torch.randint(0, self.num_preload_transitions, (num_frames,), device=self.device)
         return self.preloaded_states[ids, 0]
-    
+
     def get_transitions(self, num_transitions):
         ids = torch.randint(0, self.num_preload_transitions, (num_transitions,), device=self.device)
         return self.preloaded_states[ids, :]
-    
+
     def slerp(self, value_low, value_high, blend):
         return (1.0 - blend) * value_low + blend * value_high
 
@@ -154,7 +155,7 @@ class MotionLoader:
         angle = 2 * torch.acos(relative_quat[:, -1]).unsqueeze(-1)
         axis = normalize(relative_quat[:, :3])
         angle_slerp = self.slerp(torch.zeros_like(angle), angle, blend).squeeze(-1)
-        relative_quat_slerp = quat_from_angle_axis(angle_slerp, axis)        
+        relative_quat_slerp = quat_from_angle_axis(angle_slerp, axis)
         return normalize(quat_mul(relative_quat_slerp, quat_low))
 
     def feed_forward_generator(self, num_mini_batch, mini_batch_size):

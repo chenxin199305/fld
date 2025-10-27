@@ -28,12 +28,12 @@ class LeggedRobot(BaseTask):
     """Environment for locomotion tasks using a legged robot."""
 
     def __init__(
-        self,
-        cfg: LeggedRobotCfg,
-        sim_params: gymapi.SimParams,
-        physics_engine: gymapi.SimType,
-        sim_device: str,
-        headless: bool,
+            self,
+            cfg: LeggedRobotCfg,
+            sim_params: gymapi.SimParams,
+            physics_engine: gymapi.SimType,
+            sim_device: str,
+            headless: bool,
     ):
         """Initializes the environment instance.
 
@@ -185,7 +185,7 @@ class LeggedRobot(BaseTask):
         self.extras["episode"] = {}
         for key in self.episode_sums.keys():
             self.extras["episode"]["rew_" + key] = (
-                torch.mean(self.episode_sums[key][env_ids]) / self.max_episode_length_s
+                    torch.mean(self.episode_sums[key][env_ids]) / self.max_episode_length_s
             )
             self.episode_sums[key][env_ids] = 0.0
         # log additional curriculum info
@@ -410,12 +410,12 @@ class LeggedRobot(BaseTask):
         control_type = self.cfg.control.control_type
         if control_type == "P":
             torques = (
-                self.p_gains * (actions_scaled + self.default_dof_pos - self.dof_pos) - self.d_gains * self.dof_vel
+                    self.p_gains * (actions_scaled + self.default_dof_pos - self.dof_pos) - self.d_gains * self.dof_vel
             )
         elif control_type == "V":
             torques = (
-                self.p_gains * (actions_scaled - self.dof_vel)
-                - self.d_gains * (self.dof_vel - self.last_dof_vel) / self.sim_params.dt
+                    self.p_gains * (actions_scaled - self.dof_vel)
+                    - self.d_gains * (self.dof_vel - self.last_dof_vel) / self.sim_params.dt
             )
         elif control_type == "T":
             torques = actions_scaled
@@ -496,8 +496,8 @@ class LeggedRobot(BaseTask):
         move_up = distance > self.terrain.env_length / 2
         # robots that walked less than half of their required distance go to simpler terrains
         move_down = (
-            distance < torch.norm(self.commands[env_ids, :2], dim=1) * self.max_episode_length_s * 0.5
-        ) * ~move_up
+                            distance < torch.norm(self.commands[env_ids, :2], dim=1) * self.max_episode_length_s * 0.5
+                    ) * ~move_up
         self.terrain_levels[env_ids] += 1 * move_up - 1 * move_down
         # Robots that solve the last level are sent to a random one
         self.terrain_levels[env_ids] = torch.where(
@@ -515,8 +515,8 @@ class LeggedRobot(BaseTask):
         """
         # If the tracking reward is above 80% of the maximum, increase the range of commands
         if (
-            torch.mean(self.episode_sums["tracking_lin_vel"][env_ids]) / self.max_episode_length
-            > 0.8 * self.reward_scales["tracking_lin_vel"]
+                torch.mean(self.episode_sums["tracking_lin_vel"][env_ids]) / self.max_episode_length
+                > 0.8 * self.reward_scales["tracking_lin_vel"]
         ):
             self.command_ranges["lin_vel_x"][0] = np.clip(
                 self.command_ranges["lin_vel_x"][0] - 0.5, -self.cfg.commands.max_curriculum, 0.0
@@ -779,10 +779,10 @@ class LeggedRobot(BaseTask):
             termination_contact_names.extend([s for s in body_names if name in s])
 
         base_init_state_list = (
-            self.cfg.init_state.pos
-            + self.cfg.init_state.rot
-            + self.cfg.init_state.lin_vel
-            + self.cfg.init_state.ang_vel
+                self.cfg.init_state.pos
+                + self.cfg.init_state.rot
+                + self.cfg.init_state.lin_vel
+                + self.cfg.init_state.ang_vel
         )
         self.base_init_state = to_torch(base_init_state_list, device=self.device, requires_grad=False)
         start_pose = gymapi.Transform()
@@ -956,11 +956,11 @@ class LeggedRobot(BaseTask):
 
         if env_ids:
             points = (
-                quat_apply_yaw(
-                    self.base_quat[env_ids].repeat(1, self.num_height_points),
-                    self.height_points[env_ids],
-                )
-                + (self.root_states[env_ids, :3]).unsqueeze(1)
+                    quat_apply_yaw(
+                        self.base_quat[env_ids].repeat(1, self.num_height_points),
+                        self.height_points[env_ids],
+                    )
+                    + (self.root_states[env_ids, :3]).unsqueeze(1)
             )
         else:
             points = quat_apply_yaw(self.base_quat.repeat(1, self.num_height_points), self.height_points) + (
@@ -1089,14 +1089,14 @@ class LeggedRobot(BaseTask):
     def _reward_stand_still(self):
         # Penalize motion at zero commands
         return torch.sum(torch.abs(self.dof_pos - self.default_dof_pos), dim=1) * (
-            torch.norm(self.commands[:, :2], dim=1) < 0.1
+                torch.norm(self.commands[:, :2], dim=1) < 0.1
         )
 
     def _reward_feet_contact_forces(self):
         # penalize high contact forces
         return torch.sum(
             (
-                torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1) - self.cfg.rewards.max_contact_force
+                    torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1) - self.cfg.rewards.max_contact_force
             ).clip(min=0.0),
             dim=1,
         )

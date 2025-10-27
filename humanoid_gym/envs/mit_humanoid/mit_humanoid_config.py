@@ -16,8 +16,8 @@ class MITHumanoidFlatCfg(LeggedRobotCfg):
         max_init_terrain_level = 4
 
     class init_state(LeggedRobotCfg.init_state):
-        pos = [0.0, 0.0, 0.7] # x,y,z [m]
-        default_joint_angles = { # = target angles [rad] when action = 0.0
+        pos = [0.0, 0.0, 0.7]  # x,y,z [m]
+        default_joint_angles = {  # = target angles [rad] when action = 0.0
             "left_hip_yaw": 0.0,
             "left_hip_abad": 0.0,
             "left_hip_pitch": -0.4,
@@ -50,7 +50,7 @@ class MITHumanoidFlatCfg(LeggedRobotCfg):
             "shoulder_abad": 40.0,
             "shoulder_yaw": 40.0,
             "elbow": 40.0,
-            }  # [N*m/rad]
+        }  # [N*m/rad]
         damping = {
             "hip_yaw": 5.0,
             "hip_abad": 5.0,
@@ -61,7 +61,7 @@ class MITHumanoidFlatCfg(LeggedRobotCfg):
             "shoulder_abad": 5.0,
             "shoulder_yaw": 5.0,
             "elbow": 5.0,
-            }  # [N*m*s/rad]
+        }  # [N*m*s/rad]
 
     class asset(LeggedRobotCfg.asset):
         file = '{LEGGED_GYM_ROOT_DIR}/resources/robots/mit_humanoid/urdf/humanoid_R_sf.urdf'
@@ -84,6 +84,7 @@ class MITHumanoidFlatCfg(LeggedRobotCfg):
         tracking_reconstructed_dof_pos_arm_l_scale = 1.0
         tracking_reconstructed_dof_pos_leg_r_scale = 1.0
         tracking_reconstructed_dof_pos_arm_r_scale = 1.0
+
         class scales(LeggedRobotCfg.rewards.scales):
             orientation = -0.0
             feet_air_time = 0.0
@@ -102,10 +103,12 @@ class MITHumanoidFlatCfg(LeggedRobotCfg):
             tracking_reconstructed_dof_pos_arm_r = 1.0
             arm_near_home = -0.0
             leg_near_home = -0.0
+
     class commands(LeggedRobotCfg.commands):
         curriculum = False
         resampling_time = 5.0
         heading_command = False
+
         class ranges:
             lin_vel_x = [-0.0, 0.0]  # min max [m/s]
             lin_vel_y = [-0.0, 0.0]  # min max [m/s]
@@ -137,7 +140,6 @@ class MITHumanoidFlatCfg(LeggedRobotCfg):
         load_root = LEGGED_GYM_ROOT_DIR + "/logs/flat_mit_humanoid/fld/misc"
         load_model = "model_5000.pt"
 
-    
     class task_sampler:
         collect_samples = True
         collect_sample_step_interval = 5
@@ -151,33 +153,40 @@ class MITHumanoidFlatCfg(LeggedRobotCfg):
         curriculum_performance_threshold = 0.8
         max_num_curriculum_updates = 5
         check_update_interval = 100
+
         class offline:
             pass
+
         class random:
             pass
+
         class gmm:
             num_components = 8
+
         class alp_gmm:
             init_num_components = 8
             min_num_components = 2
             max_num_components = 10
-            random_type = "uniform" # "uniform" or "gmm"
+            random_type = "uniform"  # "uniform" or "gmm"
+
         class classifier:
             enabled = False
             num_classes = 9
 
-    
+
 class MITHumanoidFlatCfgPPO(LeggedRobotCfgPPO):
     runner_class_name = "FLDOnPolicyRunner"
+
     class policy(LeggedRobotCfgPPO.policy):
         actor_hidden_dims = [128, 128, 128]
         critic_hidden_dims = [128, 128, 128]
         init_noise_std = 1.0
+
     class runner(LeggedRobotCfgPPO.runner):
         run_name = 'min_forces'
         experiment_name = 'flat_mit_humanoid'
         algorithm_class_name = "PPO"
         policy_class_name = "ActorCritic"
-        task_sampler_class_name = "OfflineSampler" # "OfflineSampler", "GMMSampler", "RandomSampler", "ALPGMMSampler"
+        task_sampler_class_name = "OfflineSampler"  # "OfflineSampler", "GMMSampler", "RandomSampler", "ALPGMMSampler"
         load_run = -1
         max_iterations = 3000

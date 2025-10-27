@@ -12,16 +12,16 @@ class ActorCritic(nn.Module):
     is_recurrent = False
 
     def __init__(
-        self,
-        num_actor_obs,
-        num_critic_obs,
-        num_actions,
-        actor_hidden_dims=[256, 256, 256],
-        critic_hidden_dims=[256, 256, 256],
-        activation="elu",
-        init_noise_std=1.0,
-        update_obs_norm=True,
-        **kwargs,
+            self,
+            num_actor_obs,
+            num_critic_obs,
+            num_actions,
+            actor_hidden_dims=[256, 256, 256],
+            critic_hidden_dims=[256, 256, 256],
+            activation="elu",
+            init_noise_std=1.0,
+            update_obs_norm=True,
+            **kwargs,
     ):
         if kwargs:
             print(

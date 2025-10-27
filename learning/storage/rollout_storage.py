@@ -148,7 +148,6 @@ class RolloutStorage:
 
         for epoch in range(num_epochs):
             for i in range(num_mini_batches):
-
                 start = i * mini_batch_size
                 end = (i + 1) * mini_batch_size
                 batch_idx = indices[start:end]

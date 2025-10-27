@@ -13,7 +13,6 @@ import numpy as np
 import random
 import argparse
 
-
 """
 Dictionary <-> Class operations.
 """

@@ -1,5 +1,6 @@
 import torch
 
+
 class DistributionBuffer:
     def __init__(self, buffer_dim, buffer_size, device) -> None:
         self.distribution_buffer = torch.zeros(buffer_size, buffer_dim, dtype=torch.float, requires_grad=False).to(device)

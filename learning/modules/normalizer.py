@@ -39,14 +39,14 @@ class EmpiricalNormalization(nn.Module):
     """
 
     def __init__(
-        self,
-        shape,
-        batch_axis=0,
-        eps=1e-2,
-        dtype=np.float32,
-        until=None,
-        clip_threshold=None,
-        update_obs_norm=True,
+            self,
+            shape,
+            batch_axis=0,
+            eps=1e-2,
+            dtype=np.float32,
+            until=None,
+            clip_threshold=None,
+            update_obs_norm=True,
     ):
         super(EmpiricalNormalization, self).__init__()
         dtype = np.dtype(dtype)
@@ -141,6 +141,7 @@ class EmpiricalNormalization(nn.Module):
         self._mean = torch.from_numpy(np.expand_dims(mean, self.batch_axis)).to(device)
         self._var = torch.from_numpy(np.expand_dims(var, self.batch_axis)).to(device)
         self.count = torch.tensor(count).to(device)
+
 
 class Normalizer:
     def __init__(self, input_dim, device, epsilon=1e-2, clip=10.0):

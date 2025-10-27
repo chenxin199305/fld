@@ -14,18 +14,18 @@ class ActorCriticRecurrent(ActorCritic):
     is_recurrent = True
 
     def __init__(
-        self,
-        num_actor_obs,
-        num_critic_obs,
-        num_actions,
-        actor_hidden_dims=[256, 256, 256],
-        critic_hidden_dims=[256, 256, 256],
-        activation="elu",
-        rnn_type="lstm",
-        rnn_hidden_size=256,
-        rnn_num_layers=1,
-        init_noise_std=1.0,
-        **kwargs,
+            self,
+            num_actor_obs,
+            num_critic_obs,
+            num_actions,
+            actor_hidden_dims=[256, 256, 256],
+            critic_hidden_dims=[256, 256, 256],
+            activation="elu",
+            rnn_type="lstm",
+            rnn_hidden_size=256,
+            rnn_num_layers=1,
+            init_noise_std=1.0,
+            **kwargs,
     ):
         if kwargs:
             print(

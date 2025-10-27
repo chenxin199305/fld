@@ -8,7 +8,6 @@ from abc import abstractmethod, ABC
 from typing import Callable, Any, Dict
 import torch
 
-
 # Callback function for when event is triggered.
 CallbackFn = Callable[[], None]
 # Action function called when event is trigged.
@@ -20,10 +19,10 @@ class KeyboardAction(ABC):
     """Base class for keyboard event."""
 
     def __init__(
-        self,
-        name: str,
-        variable_reference: torch.Tensor = None,
-        member_name: str = None,
+            self,
+            name: str,
+            variable_reference: torch.Tensor = None,
+            member_name: str = None,
     ):
         """Initializes the keyboard action event with variable attributes.
 
@@ -41,7 +40,7 @@ class KeyboardAction(ABC):
         """
         # check input
         if (variable_reference is None and member_name is None) or (
-            variable_reference is not None and member_name is not None
+                variable_reference is not None and member_name is not None
         ):
             msg = "Invalid arguments: Action can only be applied on either reference variable or environment's member variable."
             raise ValueError(msg)
@@ -94,13 +93,13 @@ class DelegateHandle(KeyboardAction):
     """
 
     def __init__(
-        self,
-        name: str,
-        delegate: ActionFn,
-        edge_detection: bool = True,
-        callback: CallbackFn = None,
-        variable_reference: torch.Tensor = None,
-        member_name: str = None,
+            self,
+            name: str,
+            delegate: ActionFn,
+            edge_detection: bool = True,
+            callback: CallbackFn = None,
+            variable_reference: torch.Tensor = None,
+            member_name: str = None,
     ):
         """Initializes the class.
 
@@ -139,11 +138,11 @@ class Delta(DelegateHandle):
     """Keyboard action that increments the value of reference variable by scalar amount."""
 
     def __init__(
-        self,
-        name: str,
-        amount: float,
-        variable_reference: torch.Tensor,
-        callback: CallbackFn = None,
+            self,
+            name: str,
+            amount: float,
+            variable_reference: torch.Tensor,
+            callback: CallbackFn = None,
     ):
         """Initializes the class.
 
@@ -173,12 +172,12 @@ class Switch(DelegateHandle):
     """Keyboard action that toggles between values of reference variable."""
 
     def __init__(
-        self,
-        name: str,
-        start_state: torch.Tensor,
-        toggle_state: torch.Tensor,
-        variable_reference: torch.Tensor,
-        callback: CallbackFn = None,
+            self,
+            name: str,
+            start_state: torch.Tensor,
+            toggle_state: torch.Tensor,
+            variable_reference: torch.Tensor,
+            callback: CallbackFn = None,
     ):
         """Initializes the class.
 
@@ -219,12 +218,12 @@ class Button(Switch):
     """Sets the variable to value only while keyboard button is pressed."""
 
     def __init__(
-        self,
-        name: str,
-        start_state: torch.Tensor,
-        toggle_state: torch.Tensor,
-        variable_reference: torch.Tensor,
-        callback: CallbackFn = None,
+            self,
+            name: str,
+            start_state: torch.Tensor,
+            toggle_state: torch.Tensor,
+            variable_reference: torch.Tensor,
+            callback: CallbackFn = None,
     ):
         """Initializes the class.
 

@@ -16,10 +16,10 @@ class ReplayBuffer:
 
         self.step = 0
         self.num_samples = 0
-    
+
     def insert(self, state_buf):
         """Add new states to memory."""
-        
+
         num_states = state_buf.shape[0]
         start_idx = self.step
         end_idx = self.step + num_states
