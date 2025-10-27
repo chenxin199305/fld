@@ -120,8 +120,10 @@ python scripts/fld/evaluate.py
 python scripts/fld/preview.py
 ```
 
-- To visualize the original motions in the training dataset or the sampled and decoded motions in the Isaac Gym environment, set `motion_file` to the corresponding motion file.
-- Alternatively, the latent parameters can be interactively modified by setting `PLAY_LOADED_DATA` to `False`. The modified latent parameters are then decoded to the original motion space and visualized.
+- To visualize the original motions in the training dataset or the sampled and decoded motions in the Isaac Gym environment,
+  set `motion_file` to the corresponding motion file.
+- Alternatively, the latent parameters can be interactively modified by setting `PLAY_LOADED_DATA` to `False`.
+  The modified latent parameters are then decoded to the original motion space and visualized.
 
 ### Policy Training
 
@@ -130,8 +132,10 @@ python scripts/train.py --task mit_humanoid
 ```
 
 - Configure the training parameters in `humanoid_gym/envs/mit_humanoid/mit_humanoid_config.py`.
-- Choose the task sampler by setting `MITHumanoidFlatCfgPPO.runner.task_sampler_class_name` to `OfflineSampler`, `GMMSampler`, `RandomSampler` or `ALPGMMSampler`.
-- The trained policy is saved in `logs/<experiment_name>/<date_time>_<run_name>/model_<iteration>.pt`, where `<experiment_name>` and `<run_name>` are defined in the train config.
+- Choose the task sampler by setting
+    - `MITHumanoidFlatCfgPPO.runner.task_sampler_class_name` to `OfflineSampler`, `GMMSampler`, `RandomSampler` or `ALPGMMSampler`.
+- The trained policy is saved in `logs/<experiment_name>/<date_time>_<run_name>/model_<iteration>.pt`
+    - where `<experiment_name>` and `<run_name>` are defined in the train config.
 - To disable rendering, append `--headless`.
 
 ### Policy Playing
@@ -142,7 +146,8 @@ python scripts/play.py --load_run "<date_time>_<run_name>"
 
 - By default the loaded policy is the last model of the last run of the experiment folder.
 - Other runs/model iteration can be selected by setting `load_run` and `checkpoint` in the train config.
-- The target motions are randomly selected from the dataset from the path specified by `datasets_root`. These motions are first encoded to the latent space and then sent to the policy for execution.
+- The target motions are randomly selected from the dataset from the path specified by `datasets_root`.
+  These motions are first encoded to the latent space and then sent to the policy for execution.
 - The fallback mechanism is enabled by default with a theshold of 1.0 on `dynamics_error`.
 
 ## Troubleshooting
@@ -151,12 +156,16 @@ python scripts/play.py --load_run "<date_time>_<run_name>"
 RuntimeError: nvrtc: error: invalid value for --gpu-architecture (-arch)
 ```
 
-- This error occurs when the CUDA version is not compatible with the installed PyTorch version. A quick fix is to comment out decorator `@torch.jit.script` in `isaacgym/python/isaacgym/torch_utils.py`.
+- This error occurs when the CUDA version is not compatible with the installed PyTorch version. 
+- A quick fix is to comment out decorator `@torch.jit.script` in `isaacgym/python/isaacgym/torch_utils.py`.
 
 ## Known Issues
 
-The `ALPGMMSampler` utilizes [faiss](https://github.com/facebookresearch/faiss) for efficient similarity search and clustering of dense vectors in the latent parameterization space.
-The installation of `faiss` requires a compatible CUDA version. The current implementation is tested with `faiss-cpu` and `faiss-gpu` with `cuda-10.2`.
+The `ALPGMMSampler` utilizes [faiss](https://github.com/facebookresearch/faiss) for efficient similarity search and
+clustering of dense vectors in the latent parameterization space.
+
+The installation of `faiss` requires a compatible CUDA version.
+The current implementation is tested with `faiss-cpu` and `faiss-gpu` with `cuda-10.2`.
 
 ## Citation
 
