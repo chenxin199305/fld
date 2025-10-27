@@ -15,11 +15,17 @@ using [NVIDIA Isaac Gym](https://developer.nvidia.com/isaac-gym).
 
 ## Installation
 
-1. Create a new python virtual environment with `python 3.8`
-2. Install `pytorch 1.10` with `cuda-11.3`
+1. Create a new conda virtual environment with `python 3.8`
 
     ```
-    pip3 install torch==1.10.0+cu113 torchvision==0.11.1+cu113 torchaudio==0.10.0+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html
+    conda create -n fld python=3.8
+    conda activate fld
+    ```
+
+2. Install `pytorch`
+
+    ```
+    pip install torch torchvision torchaudio
     ```
 
 3. Install Isaac Gym
@@ -83,7 +89,8 @@ python scripts/fld/experiment.py
         - the latent parameters in each latent channel along sampled trajectories for each motion with the formed latent manifold
         - the latent parameter distribution.
 - The trained FLD model is saved in `logs/<experiment_name>/fld/misc/model_<iteration>.pt`, where `<experiment_name>` is defined in the experiment config.
-- The training process is logged in the same folder. Run `tensorboard --logdir logs/<experiment_name>/fld/misc/ --samples_per_plugin images=100` to visualize the training loss and plots.
+- The training process is logged in the same folder.
+    - Run `tensorboard --logdir logs/<experiment_name>/fld/misc/ --samples_per_plugin images=100` to visualize the training loss and plots.
 - A `statistics.pt` file is saved in the same folder, containing the mean and standard deviation of the input data and the statistics of the latent parameterization space.
   This file is used to normalize the input data and to define plotting ranges during policy training.
 
@@ -97,14 +104,15 @@ python scripts/fld/evaluate.py
     - This file is used to define the input data for policy training with the offline task sampler.
 - A `gmm.pt` file is saved in the same folder, containing the Gaussian Mixture Model (GMM) of the latent parameters.
     - This file is used to define the input data distribution for policy training with the offline gmm task sampler.
-- A set of latent parameters is sampled and reconstructed to the original motion space. The decoded motion is saved in `resources/robots/mit_humanoid/datasets/decoded/motion_data.pt`.
+- A set of latent parameters is sampled and reconstructed to the original motion space.
+    - The decoded motion is saved in `resources/robots/mit_humanoid/datasets/decoded/motion_data.pt`.
     - Figure 1 shows the latent sample and the reconstructed motion trajectory.
     - Figure 2 shows the sampled latent parameters.
     - Figure 3 shows the latent manifold of the sampled trajectory, along with the original ones.
     - Figure 4 shows the GMM of the latent parameters.
 - Note that the motion contains only kinematic and proprioceptive information.
     - For visualization only, the global position and orientation of the robot base are approximated by integrating the velocity information with finite difference.
-    - Depending on the finite difference method and the intial states, the global position and orientation may be inaccurate and drift over time.
+    - Depending on the finite difference method and the initial states, the global position and orientation may be inaccurate and drift over time.
 
 ### Motion Visualization
 
@@ -147,7 +155,7 @@ RuntimeError: nvrtc: error: invalid value for --gpu-architecture (-arch)
 
 ## Known Issues
 
-The `ALPGMMSampler` utilizes [faiss](https://github.com/facebookresearch/faiss) for efficient similarity search and clustering of dense vectors in the latent parameterization space. 
+The `ALPGMMSampler` utilizes [faiss](https://github.com/facebookresearch/faiss) for efficient similarity search and clustering of dense vectors in the latent parameterization space.
 The installation of `faiss` requires a compatible CUDA version. The current implementation is tested with `faiss-cpu` and `faiss-gpu` with `cuda-10.2`.
 
 ## Citation
