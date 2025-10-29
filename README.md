@@ -156,7 +156,7 @@ python scripts/play.py --load_run "<date_time>_<run_name>"
 RuntimeError: nvrtc: error: invalid value for --gpu-architecture (-arch)
 ```
 
-- This error occurs when the CUDA version is not compatible with the installed PyTorch version. 
+- This error occurs when the CUDA version is not compatible with the installed PyTorch version.
 - A quick fix is to comment out decorator `@torch.jit.script` in `isaacgym/python/isaacgym/torch_utils.py`.
 
 ## Known Issues

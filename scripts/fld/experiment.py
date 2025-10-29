@@ -25,8 +25,8 @@ class FLDExperiment:
                 torch.tensor(ids, device=device, dtype=torch.long, requires_grad=False)
                 for state, ids in state_idx_dict.items()
                 if ((state != "base_pos") and (state != "base_quat"))
-                ]
-            )
+            ]
+        )
         self.device = device
 
     def prepare_data(self):
@@ -44,20 +44,23 @@ class FLDExperiment:
 
         for i, motion_name in enumerate(motion_name_set):
             motion_path = os.path.join(datasets_root, "motion_data_" + motion_name + ".pt")
-            motion_data = torch.load(motion_path, map_location=self.device)[:, :, self.dim_of_interest] # (num_trajs, traj_len, obs_dim)
+            motion_data = torch.load(motion_path, map_location=self.device)[:, :, self.dim_of_interest]  # (num_trajs, traj_len, obs_dim)
             loaded_num_trajs, loaded_num_steps, loaded_obs_dim = motion_data.size()
-            print(f"[Motion Loader] Loaded motion {motion_name} with {loaded_num_trajs} trajectories, {loaded_num_steps} steps with {loaded_obs_dim} dimensions.")
+            print(f"[Motion Loader] "
+                  f"Loaded motion {motion_name} with {loaded_num_trajs} trajectories, "
+                  f"{loaded_num_steps} steps with {loaded_obs_dim} dimensions.")
             motion_data_collection.append(motion_data.unsqueeze(0))
 
-        motion_data_collection = torch.cat(motion_data_collection, dim=0) # (num_motions, num_trajs, traj_len, obs_dim)
+        motion_data_collection = torch.cat(motion_data_collection, dim=0)  # (num_motions, num_trajs, traj_len, obs_dim)
         self.state_transitions_mean = motion_data_collection.flatten(0, 2).mean(dim=0)
         self.state_transitions_std = motion_data_collection.flatten(0, 2).std(dim=0) + 1e-6
 
         # Unfold the data to prepare for training
-        # num_steps denotes the trajectory length induced by bootstrapping the window of history_horizon forward with forecast_horizon steps
+        # num_steps denotes the trajectory length induced by
+        # bootstrapping the window of history_horizon forward with forecast_horizon steps
         # num_groups denotes the number of such num_steps
-        motion_data_collection = motion_data_collection.unfold(2, self.history_horizon + self.forecast_horizon - 1, 1).swapaxes(-2, -1) # (num_motions, num_trajs, num_groups, num_steps, obs_dim)
-        self.state_transitions_data = (motion_data_collection - self.state_transitions_mean) / self.state_transitions_std # (num_motions, num_trajs, num_groups, num_steps, obs_dim)
+        motion_data_collection = motion_data_collection.unfold(2, self.history_horizon + self.forecast_horizon - 1, 1).swapaxes(-2, -1)  # (num_motions, num_trajs, num_groups, num_steps, obs_dim)
+        self.state_transitions_data = (motion_data_collection - self.state_transitions_mean) / self.state_transitions_std  # (num_motions, num_trajs, num_groups, num_steps, obs_dim)
 
     def train(self, log_dir, latent_dim):
         """
@@ -85,7 +88,7 @@ class FLDExperiment:
             device="cuda",
             loss_function="geometric",
             noise_level=0.1,
-            )
+        )
         fld_training.train(max_iterations=5000)
         fld_training.fit_gmm(covariance_type="full")
 
@@ -102,13 +105,12 @@ if __name__ == "__main__":
         "dof_pos_leg_r": [25, 26, 27, 28, 29],
         "dof_pos_arm_r": [30, 31, 32, 33],
     }
-    history_horizon = 51 # the window size of the input state transitions
+    history_horizon = 51  # the window size of the input state transitions
     latent_dim = 8
-    forecast_horizon = 50 # the autoregressive prediction steps while obeying the quasi-constant latent parameterization
+    forecast_horizon = 50  # the autoregressive prediction steps while obeying the quasi-constant latent parameterization
     device = "cuda"
     log_dir_root = LEGGED_GYM_ROOT_DIR + "/logs/flat_mit_humanoid/fld/"
     log_dir = log_dir_root + "misc"
     fld_experiment = FLDExperiment(state_idx_dict, history_horizon, forecast_horizon, device)
     fld_experiment.prepare_data()
     fld_experiment.train(log_dir, latent_dim)
-    
