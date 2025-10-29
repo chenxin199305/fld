@@ -39,28 +39,46 @@ class FLDExperiment:
         """
         datasets_root = os.path.join(LEGGED_GYM_ROOT_DIR + "/resources/robots/mit_humanoid/datasets/misc")
         motion_data = os.listdir(datasets_root)
-        motion_name_set = [data.replace('motion_data_', '').replace('.pt', '') for data in motion_data if "combined" not in data and ".pt" in data]
+        motion_name_set = [data.replace('motion_data_', '').replace('.pt', '')
+                           for data in motion_data if "combined" not in data and ".pt" in data]
+
+        # --------------------------------------------------
+
         motion_data_collection = []
 
         for i, motion_name in enumerate(motion_name_set):
             motion_path = os.path.join(datasets_root, "motion_data_" + motion_name + ".pt")
-            motion_data = torch.load(motion_path, map_location=self.device)[:, :, self.dim_of_interest]  # (num_trajs, traj_len, obs_dim)
+
+            # (num_trajs, traj_len, obs_dim)
+            motion_data = torch.load(motion_path, map_location=self.device)[:, :, self.dim_of_interest]
             loaded_num_trajs, loaded_num_steps, loaded_obs_dim = motion_data.size()
+
             print(f"[Motion Loader] "
                   f"Loaded motion {motion_name} with {loaded_num_trajs} trajectories, "
                   f"{loaded_num_steps} steps with {loaded_obs_dim} dimensions.")
+
             motion_data_collection.append(motion_data.unsqueeze(0))
 
-        motion_data_collection = torch.cat(motion_data_collection, dim=0)  # (num_motions, num_trajs, traj_len, obs_dim)
+        # (num_motions, num_trajs, traj_len, obs_dim)
+        motion_data_collection = torch.cat(motion_data_collection, dim=0)
+
         self.state_transitions_mean = motion_data_collection.flatten(0, 2).mean(dim=0)
         self.state_transitions_std = motion_data_collection.flatten(0, 2).std(dim=0) + 1e-6
+
+        # --------------------------------------------------
 
         # Unfold the data to prepare for training
         # num_steps denotes the trajectory length induced by
         # bootstrapping the window of history_horizon forward with forecast_horizon steps
         # num_groups denotes the number of such num_steps
-        motion_data_collection = motion_data_collection.unfold(2, self.history_horizon + self.forecast_horizon - 1, 1).swapaxes(-2, -1)  # (num_motions, num_trajs, num_groups, num_steps, obs_dim)
-        self.state_transitions_data = (motion_data_collection - self.state_transitions_mean) / self.state_transitions_std  # (num_motions, num_trajs, num_groups, num_steps, obs_dim)
+
+        # (num_motions, num_trajs, num_groups, num_steps, obs_dim)
+        motion_data_collection = motion_data_collection.unfold(2, self.history_horizon + self.forecast_horizon - 1, 1).swapaxes(-2, -1)
+
+        # (num_motions, num_trajs, num_groups, num_steps, obs_dim)
+        self.state_transitions_data = (motion_data_collection - self.state_transitions_mean) / self.state_transitions_std
+
+        # --------------------------------------------------
 
     def train(self, log_dir, latent_dim):
         """

@@ -3,6 +3,25 @@ import torch.nn as nn
 
 
 class FLD(nn.Module):
+    """
+    FLD (Fourier Latent Dynamics) is a PyTorch module designed to encode, decode, and predict dynamics
+    in time-series data using Fourier-based latent representations.
+
+    Attributes:
+        input_channel (int): Number of input channels (observation dimensions).
+        history_horizon (int): Length of the input time-series history.
+        latent_channel (int): Number of latent channels for encoding.
+        device (torch.device): Device to run the model on (e.g., 'cpu' or 'cuda').
+        dt (float): Time step between observations.
+        args (torch.Tensor): Time arguments for Fourier transformations.
+        freqs (torch.Tensor): Frequencies for Fourier transformations.
+        encoder_shape (list): Shape of the encoder layers.
+        decoder_shape (list): Shape of the decoder layers.
+        encoder (nn.Sequential): Encoder network for feature extraction.
+        phase_encoder (nn.ModuleList): Phase encoder for latent dynamics.
+        decoder (nn.Sequential): Decoder network for reconstructing input signals.
+    """
+
     def __init__(self,
                  observation_dim,
                  history_horizon,
@@ -13,6 +32,19 @@ class FLD(nn.Module):
                  decoder_shape=None,
                  **kwargs,
                  ):
+        """
+        Initializes the FLD model.
+
+        Args:
+            observation_dim (int): Number of input channels (observation dimensions).
+            history_horizon (int): Length of the input time-series history.
+            latent_channel (int): Number of latent channels for encoding.
+            device (torch.device): Device to run the model on (e.g., 'cpu' or 'cuda').
+            dt (float, optional): Time step between observations. Defaults to 0.02.
+            encoder_shape (list, optional): Shape of the encoder layers. Defaults to None.
+            decoder_shape (list, optional): Shape of the decoder layers. Defaults to None.
+            **kwargs: Additional arguments (ignored).
+        """
         if kwargs:
             print("FLD.__init__ got unexpected arguments, which will be ignored: "
                   + str([key for key in kwargs.keys()]))
@@ -107,6 +139,16 @@ class FLD(nn.Module):
         self.decoder.train()
 
     def forward(self, x, k=1):
+        """
+        Forward pass of the FLD model.
+
+        Args:
+            x (torch.Tensor): Input tensor of shape (batch_size, input_channel, history_horizon).
+            k (int, optional): Number of prediction steps. Defaults to 1.
+
+        Returns:
+            tuple: Predicted dynamics, latent representation, reconstructed signal, and parameters.
+        """
         x = self.encoder(x)
         latent = x
         frequency, amplitude, offset = self.fft(x)
@@ -115,16 +157,35 @@ class FLD(nn.Module):
             phase_shift = self.phase_encoder[i](x[:, i, :])
             phase[:, i] = torch.atan2(phase_shift[:, 1], phase_shift[:, 0]) / (2 * torch.pi)
 
-        params = [phase, frequency, amplitude, offset]  # (batch_size, latent_channel)
+        # (batch_size, latent_channel)
+        params = [phase, frequency, amplitude, offset]
 
-        phase_dynamics = phase.unsqueeze(0) + frequency.unsqueeze(0) * self.dt * torch.arange(0, k, device=self.device, dtype=torch.float, requires_grad=False).view(-1, 1, 1)  # (k, batch_size, latent_channel)
-        z = amplitude.unsqueeze(-1).unsqueeze(0) * torch.sin(2 * torch.pi * ((frequency.unsqueeze(-1) * self.args).unsqueeze(0) + phase_dynamics.unsqueeze(-1))) + offset.unsqueeze(-1).unsqueeze(0)  # (k, batch_size, latent_channel, history_horizon)
+        # (k, batch_size, latent_channel)
+        phase_dynamics = phase.unsqueeze(0) \
+                         + frequency.unsqueeze(0) * self.dt * torch.arange(0, k, device=self.device, dtype=torch.float, requires_grad=False).view(-1, 1, 1)
+
+        # (k, batch_size, latent_channel, history_horizon)
+        z = amplitude.unsqueeze(-1).unsqueeze(0) * torch.sin(2 * torch.pi * ((frequency.unsqueeze(-1) * self.args).unsqueeze(0)
+                                                                             + phase_dynamics.unsqueeze(-1))) \
+            + offset.unsqueeze(-1).unsqueeze(0)
+
         signal = z[0]
-        pred_dynamics = self.decoder(z.flatten(0, 1)).view(k, -1, self.input_channel, self.history_horizon)  # (k, batch_size, input_channel, history_horizon)
+        
+        # (k, batch_size, input_channel, history_horizon)
+        pred_dynamics = self.decoder(z.flatten(0, 1)).view(k, -1, self.input_channel, self.history_horizon)
 
         return pred_dynamics, latent, signal, params
 
     def fft(self, x):
+        """
+        Computes the Fourier Transform of the input tensor.
+
+        Args:
+            x (torch.Tensor): Input tensor of shape (batch_size, latent_channel, history_horizon).
+
+        Returns:
+            tuple: Frequency, amplitude, and offset of the Fourier Transform.
+        """
         rfft = torch.fft.rfft(x, dim=2)
         magnitude = rfft.abs()
         spectrum = magnitude[:, :, 1:]
@@ -135,6 +196,16 @@ class FLD(nn.Module):
         return frequency, amplitude, offset
 
     def get_dynamics_error(self, state_transitions, k):
+        """
+        Computes the dynamics prediction error.
+
+        Args:
+            state_transitions (torch.Tensor): Input state transitions of shape (batch_size, sequence_length, input_channel).
+            k (int): Number of prediction steps.
+
+        Returns:
+            torch.Tensor: Dynamics prediction error for each batch.
+        """
         self.eval()
         state_transitions_sequence = torch.zeros(
             state_transitions.size(0),
