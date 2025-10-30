@@ -1,5 +1,5 @@
 """
-This module contains the `FLDTraining` class, which is responsible for training the FLD (Fourier Latent Dynamics) model.
+This module contains the `VAETraining` class, which is responsible for training the VAE (Fourier Latent Dynamics) model.
 It includes methods for training, saving, loading, and evaluating the model, as well as fitting a Gaussian Mixture Model (GMM)
 to the latent parameterization of state transitions.
 
@@ -7,10 +7,10 @@ Dependencies:
 - PyTorch for tensor operations and model training.
 - Matplotlib for plotting.
 - TensorBoard for logging training metrics.
-- Custom modules: FLD, Plotter, GaussianMixture, ReplayBuffer, DistributionBuffer.
+- Custom modules: VAE, Plotter, GaussianMixture, ReplayBuffer, DistributionBuffer.
 """
 
-from learning.modules.fld import FLD
+from learning.modules.vae import VAE
 from learning.modules.plotter import Plotter
 from learning.modules.gmm import GaussianMixture
 from learning.storage.replay_buffer import ReplayBuffer
@@ -23,9 +23,9 @@ import matplotlib.pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
 
 
-class FLDTraining:
+class VAETraining:
     """
-    Class for training the FLD model.
+    Class for training the VAE model.
 
     Args:
         log_dir (str): The directory to save the training logs.
@@ -36,11 +36,11 @@ class FLDTraining:
         state_transitions_data (torch.Tensor): The state transitions data.
         state_transitions_mean (torch.Tensor): The mean of the state transitions data.
         state_transitions_std (torch.Tensor): The standard deviation of the state transitions data.
-        fld_encoder_shape (list, optional): The shape of the FLD encoder. Defaults to None.
-        fld_decoder_shape (list, optional): The shape of the FLD decoder. Defaults to None.
-        fld_learning_rate (float, optional): The learning rate for FLD optimization. Defaults to 0.0001.
-        fld_weight_decay (float, optional): The weight decay for FLD optimization. Defaults to 0.0005.
-        fld_num_mini_batches (int, optional): The number of mini-batches for FLD training. Defaults to 80.
+        vae_encoder_shape (list, optional): The shape of the VAE encoder. Defaults to None.
+        vae_decoder_shape (list, optional): The shape of the VAE decoder. Defaults to None.
+        vae_learning_rate (float, optional): The learning rate for VAE optimization. Defaults to 0.0001.
+        vae_weight_decay (float, optional): The weight decay for VAE optimization. Defaults to 0.0005.
+        vae_num_mini_batches (int, optional): The number of mini-batches for VAE training. Defaults to 80.
         device (str, optional): The device to use for training. Defaults to "cuda".
         loss_function (str, optional): The loss function to use. Can be "mse" or "geometric". Defaults to "mse".
         noise_level (float, optional): The level of noise to add to the input data. Defaults to 0.0.
@@ -56,18 +56,18 @@ class FLDTraining:
                  state_transitions_data,
                  state_transitions_mean,
                  state_transitions_std,
-                 fld_encoder_shape=None,
-                 fld_decoder_shape=None,
-                 fld_learning_rate=0.0001,
-                 fld_weight_decay=0.0005,
-                 fld_num_mini_batches=80,
+                 vae_encoder_shape=None,
+                 vae_decoder_shape=None,
+                 vae_learning_rate=0.0001,
+                 vae_weight_decay=0.0005,
+                 vae_num_mini_batches=80,
                  device="cuda",
                  loss_function="mse",  # mse or geometric
                  noise_level=0.0,
                  loss_horizon_discount=1.0,
                  ) -> None:
         """
-        Initializes the FLDTraining class and its components, including the FLD model, optimizer, buffers, and plotting utilities.
+        Initializes the VAETraining class and its components, including the VAE model, optimizer, buffers, and plotting utilities.
         """
 
         # num_steps denotes the trajectory length induced by bootstrapping the window of history_horizon forward with forecast_horizon steps
@@ -86,7 +86,7 @@ class FLDTraining:
         self.state_transitions_data = state_transitions_data
         self.state_transitions_mean = state_transitions_mean
         self.state_transitions_std = state_transitions_std
-        self.fld_num_mini_batches = fld_num_mini_batches
+        self.vae_num_mini_batches = vae_num_mini_batches
         self.device = device
         self.loss_function = loss_function
         self.noise_level = noise_level
@@ -116,9 +116,9 @@ class FLDTraining:
                     self.loss_scale[..., ids] = 0.5
         self.loss_scale *= torch.pow(self.loss_horizon_discount, torch.arange(self.history_horizon, device=self.device, dtype=torch.float, requires_grad=False)).view(1, -1, 1)
 
-        # Initialize the FLD model and optimizer
-        self.fld = FLD(self.observation_dim, self.history_horizon, self.latent_dim, self.device, encoder_shape=fld_encoder_shape, decoder_shape=fld_decoder_shape)
-        self.fld_optimizer = optim.Adam(self.fld.parameters(), lr=fld_learning_rate, weight_decay=fld_weight_decay)
+        # Initialize the VAE model and optimizer
+        self.vae = VAE(self.observation_dim, self.history_horizon, self.latent_dim, self.device, encoder_shape=vae_encoder_shape, decoder_shape=vae_decoder_shape)
+        self.vae_optimizer = optim.Adam(self.vae.parameters(), lr=vae_learning_rate, weight_decay=vae_weight_decay)
 
         # Initialize replay and distribution buffers
         self.replay_buffer_size = self.num_motions * self.num_trajs * self.num_groups
@@ -156,18 +156,18 @@ class FLDTraining:
 
     def train(self, max_iterations=1000):
         """
-        Train the FLD model.
+        Train the VAE model.
 
         Args:
             max_iterations (int, optional): The maximum number of training iterations. Defaults to 1000.
         """
-        print("[FLD] Training started.")
+        print("[VAE] Training started.")
         tot_iter = self.current_learning_iteration + max_iterations
-        mean_fld_loss = 0
+        mean_vae_loss = 0
         for it in range(self.current_learning_iteration, tot_iter):
             state_transitions_data_generator = self.state_transitions.feed_forward_generator(
-                self.fld_num_mini_batches,
-                self.num_motions * self.num_trajs * self.num_groups // self.fld_num_mini_batches
+                self.vae_num_mini_batches,
+                self.num_motions * self.num_trajs * self.num_groups // self.vae_num_mini_batches
             )
 
             # --------------------------------------------------
@@ -184,7 +184,7 @@ class FLDTraining:
                 # latent: (mini_batch_size, latent_dim, history_horizon)
                 # signal: (mini_batch_size, latent_dim, history_horizon)
                 # params: 4-tuple of (phase, frequency, amplitude, offset) each of shape (mini_batch_size, latent_dim)
-                pred_dynamics, latent, signal, params = self.fld.forward(batch_input, k=self.forecast_horizon)
+                pred_dynamics, latent, signal, params = self.vae.forward(batch_input, k=self.forecast_horizon)
                 phase, frequency, amplitude, offset = params
 
                 # reconstruction loss
@@ -193,45 +193,45 @@ class FLDTraining:
                     # compute loss for each step of forecast_horizon
                     reconstruction_loss = self.compute_loss(pred_dynamics[i, :, :, :].swapaxes(-2, -1), batch.swapaxes(-2, -1)[:, i])
                     loss += reconstruction_loss
-                mean_fld_loss += loss.item()
+                mean_vae_loss += loss.item()
 
                 # Backpropagation and optimization step
-                self.fld_optimizer.zero_grad()
+                self.vae_optimizer.zero_grad()
                 loss.backward()
-                self.fld_optimizer.step()
+                self.vae_optimizer.step()
 
                 self.distribution_frequency.insert(frequency.detach())
                 self.distribution_amplitude.insert(amplitude.detach())
                 self.distribution_offset.insert(offset.detach())
 
-            fld_num_updates = self.fld_num_mini_batches
-            mean_fld_loss /= fld_num_updates
+            vae_num_updates = self.vae_num_mini_batches
+            mean_vae_loss /= vae_num_updates
 
             # --------------------------------------------------
 
-            self.writer.add_scalar(f"fld/loss", mean_fld_loss, it)
-            print(f"[FLD] Training iteration {it}/{self.current_learning_iteration + max_iterations}.")
+            self.writer.add_scalar(f"vae/loss", mean_vae_loss, it)
+            print(f"[VAE] Training iteration {it}/{self.current_learning_iteration + max_iterations}.")
 
             if it % 50 == 0:
                 self.save(it)
 
                 with torch.no_grad():
-                    self.fld.eval()
+                    self.vae.eval()
 
                     plot_traj_index = 0
                     self.plotter.plot_distribution(self.ax0[0], self.distribution_frequency.get_distribution(), title="Frequency Distribution")
                     self.plotter.plot_distribution(self.ax0[1], self.distribution_amplitude.get_distribution(), title="Amplitude Distribution")
                     self.plotter.plot_distribution(self.ax0[2], self.distribution_offset.get_distribution(), title="Offset Distribution")
-                    self.writer.add_figure("fld/param_distribution", self.fig0, it)
+                    self.writer.add_figure("vae/param_distribution", self.fig0, it)
                     eval_manifold_collection = []
 
                     for i in range(self.num_motions):
                         eval_traj = self.state_transitions_data[i, 0, :, :self.history_horizon, :].swapaxes(1, 2)
-                        pred_dynamics, latent, signal, params = self.fld(eval_traj)
+                        pred_dynamics, latent, signal, params = self.vae(eval_traj)
 
                         pred = pred_dynamics[0]
                         self.plotter.plot_curves(self.ax1[0], eval_traj[plot_traj_index], -1.0, 1.0, -5.0, 5.0,
-                                                 title="Motion Curves" + " " + str(self.fld.input_channel) + "x" + str(self.history_horizon), show_axes=False)
+                                                 title="Motion Curves" + " " + str(self.vae.input_channel) + "x" + str(self.history_horizon), show_axes=False)
                         self.plotter.plot_curves(self.ax1[1], latent[plot_traj_index], -1.0, 1.0, -2.0, 2.0,
                                                  title="Latent Convolutional Embedding" + " " + str(self.latent_dim) + "x" + str(self.history_horizon), show_axes=False)
                         self.plotter.plot_circles(self.ax1[2], params[0][plot_traj_index], params[2][plot_traj_index],
@@ -239,10 +239,10 @@ class FLDTraining:
                         self.plotter.plot_curves(self.ax1[3], signal[plot_traj_index], -1.0, 1.0, -2.0, 2.0,
                                                  title="Latent Parametrized Signal" + " " + str(self.latent_dim) + "x" + str(self.history_horizon), show_axes=False)
                         self.plotter.plot_curves(self.ax1[4], pred[plot_traj_index], -1.0, 1.0, -5.0, 5.0,
-                                                 title="Curve Reconstruction" + " " + str(self.fld.input_channel) + "x" + str(self.history_horizon), show_axes=False)
+                                                 title="Curve Reconstruction" + " " + str(self.vae.input_channel) + "x" + str(self.history_horizon), show_axes=False)
                         self.plotter.plot_curves(self.ax1[5], torch.vstack((eval_traj[plot_traj_index].flatten(0, 1), pred[plot_traj_index].flatten(0, 1))), -1.0, 1.0, -5.0, 5.0,
-                                                 title="Curve Reconstruction (Flattened)" + " " + str(1) + "x" + str(self.fld.input_channel * self.history_horizon), show_axes=False)
-                        self.writer.add_figure(f"fld/reconstruction/motion_{i}", self.fig1, it)
+                                                 title="Curve Reconstruction (Flattened)" + " " + str(1) + "x" + str(self.vae.input_channel * self.history_horizon), show_axes=False)
+                        self.writer.add_figure(f"vae/reconstruction/motion_{i}", self.fig1, it)
 
                         for j in range(self.latent_dim):
                             phase = params[0][:, j]
@@ -259,7 +259,7 @@ class FLDTraining:
                                                      title=("Amplitudes" if j == 0 else None), show_axes=False)
                             self.plotter.plot_curves(self.ax2[j, 4], offset.unsqueeze(0), -1.0, 1.0, -1.0, 1.0,
                                                      title=("Offsets" if j == 0 else None), show_axes=False)
-                        self.writer.add_figure(f"fld/channel_params/motion_{i}", self.fig2, it)
+                        self.writer.add_figure(f"vae/channel_params/motion_{i}", self.fig2, it)
 
                         phase = params[0]
                         amplitude = params[2]
@@ -272,15 +272,15 @@ class FLDTraining:
                         eval_manifold_collection.append(manifold.cpu())
 
                     self.plotter.plot_pca(self.ax3, eval_manifold_collection, "Phase Manifold (" + str(self.num_motions) + " Random Sequences)")
-                    self.writer.add_figure("fld/phase_manifold", self.fig3, it)
+                    self.writer.add_figure("vae/phase_manifold", self.fig3, it)
 
-                    self.fld.train()
+                    self.vae.train()
 
         # --------------------------------------------------
 
         self.current_learning_iteration += max_iterations
         self.save(self.current_learning_iteration)
-        print("[FLD] Training finished.")
+        print("[VAE] Training finished.")
 
     def save(self, it):
         """
@@ -309,8 +309,8 @@ class FLDTraining:
         )
         torch.save(
             {
-                "fld_state_dict": self.fld.state_dict(),
-                "fld_optimizer_state_dict": self.fld_optimizer.state_dict(),
+                "vae_state_dict": self.vae.state_dict(),
+                "vae_optimizer_state_dict": self.vae_optimizer.state_dict(),
                 "iter": it,
             },
             self.log_dir + f"/model_{it}.pt"
@@ -324,11 +324,11 @@ class FLDTraining:
             path (str): Path to the checkpoint file.
             load_optimizer (bool, optional): Whether to load the optimizer state. Defaults to True.
         """
-        print(f"[FLD] Loading model from: {path}.")
+        print(f"[VAE] Loading model from: {path}.")
         loaded_dict = torch.load(path)
-        self.fld.load_state_dict(loaded_dict["fld_state_dict"])
+        self.vae.load_state_dict(loaded_dict["vae_state_dict"])
         if load_optimizer:
-            self.fld_optimizer.load_state_dict(loaded_dict["fld_optimizer_state_dict"])
+            self.vae_optimizer.load_state_dict(loaded_dict["vae_optimizer_state_dict"])
         self.current_learning_iteration = loaded_dict["iter"]
 
     def fit_gmm(self, covariance_type="diag"):
@@ -343,14 +343,14 @@ class FLDTraining:
         self.gmm = GaussianMixture(self.num_motions, self.latent_dim * 3, device=self.device, covariance_type=covariance_type)
         all_state_transitions = self.state_transitions_data[:, :, :, :self.history_horizon, :].flatten(0, 2).swapaxes(1, 2)  # (num_motions * num_trajs * num_groups, obs_dim, history_horizon)
         with torch.no_grad():
-            self.fld.eval()
-            _, _, _, all_params = self.fld(all_state_transitions)
+            self.vae.eval()
+            _, _, _, all_params = self.vae(all_state_transitions)
         all_frequency = all_params[1]  # (num_motions * num_trajs * num_groups, latent_dim)
         all_amplitude = all_params[2]  # (num_motions * num_trajs * num_groups, latent_dim)
         all_offset = all_params[3]  # (num_motions * num_trajs * num_groups, latent_dim)
-        print("[FLD] GMM fitting started.")
+        print("[VAE] GMM fitting started.")
         self.gmm.fit(torch.cat((all_frequency, all_amplitude, all_offset), dim=1))
-        print("[FLD] GMM fitting finished.")
+        print("[VAE] GMM fitting finished.")
         mu, var = self.gmm.get_block_parameters(self.latent_dim)
         self.plotter.plot_gmm(self.ax4[0], all_frequency.view(self.num_motions, -1, self.latent_dim), mu[0], var[0], title="Frequency GMM")
         self.plotter.plot_gmm(self.ax4[1], all_amplitude.view(self.num_motions, -1, self.latent_dim), mu[1], var[1], title="Amplitude GMM")

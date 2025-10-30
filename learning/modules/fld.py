@@ -22,16 +22,17 @@ class FLD(nn.Module):
         decoder (nn.Sequential): Decoder network for reconstructing input signals.
     """
 
-    def __init__(self,
-                 observation_dim,
-                 history_horizon,
-                 latent_channel,
-                 device,
-                 dt=0.02,
-                 encoder_shape=None,
-                 decoder_shape=None,
-                 **kwargs,
-                 ):
+    def __init__(
+            self,
+            observation_dim,
+            history_horizon,
+            latent_channel,
+            device,
+            dt=0.02,
+            encoder_shape=None,
+            decoder_shape=None,
+            **kwargs,
+    ):
         """
         Initializes the FLD model.
 
@@ -48,7 +49,9 @@ class FLD(nn.Module):
         if kwargs:
             print("FLD.__init__ got unexpected arguments, which will be ignored: "
                   + str([key for key in kwargs.keys()]))
+
         super(FLD, self).__init__()
+
         self.input_channel = observation_dim
         self.history_horizon = history_horizon
         self.latent_channel = latent_channel
@@ -60,6 +63,7 @@ class FLD(nn.Module):
         self.encoder_shape = encoder_shape if encoder_shape is not None else [int(self.input_channel / 3)]
         self.decoder_shape = decoder_shape if decoder_shape is not None else [int(self.input_channel / 3)]
 
+        # --- Encoder ---
         encoder_layers = []
         curr_in_channel = self.input_channel
         for hidden_channel in self.encoder_shape:
@@ -105,6 +109,7 @@ class FLD(nn.Module):
             self.phase_encoder.append(phase_encoder)
         self.phase_encoder.train()
 
+        # --- Decoder ---
         decoder_layers = []
         curr_in_channel = latent_channel
         for hidden_channel in self.decoder_shape:
@@ -170,7 +175,7 @@ class FLD(nn.Module):
             + offset.unsqueeze(-1).unsqueeze(0)
 
         signal = z[0]
-        
+
         # (k, batch_size, input_channel, history_horizon)
         pred_dynamics = self.decoder(z.flatten(0, 1)).view(k, -1, self.input_channel, self.history_horizon)
 
