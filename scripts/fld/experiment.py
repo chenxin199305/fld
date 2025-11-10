@@ -123,9 +123,18 @@ if __name__ == "__main__":
         "dof_pos_leg_r": [25, 26, 27, 28, 29],
         "dof_pos_arm_r": [30, 31, 32, 33],
     }
-    history_horizon = 51  # the window size of the input state transitions
+
+    """
+    Jason 2025-11-10:
+    这里估计是取了历史窗口51帧，然后预测未来50帧的状态转移。
+    51帧如果是以50Hz采样的话，大概是1秒钟的数据。
+    """
+    # the window size of the input state transitions
+    history_horizon = 51
+    # the autoregressive prediction steps while obeying the quasi-constant latent parameterization
+    forecast_horizon = 50
     latent_dim = 8
-    forecast_horizon = 50  # the autoregressive prediction steps while obeying the quasi-constant latent parameterization
+
     device = "cuda"
     log_dir_root = LEGGED_GYM_ROOT_DIR + "/logs/flat_mit_humanoid/fld/"
     log_dir = log_dir_root + "misc"

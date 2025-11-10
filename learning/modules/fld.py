@@ -27,7 +27,7 @@ class FLD(nn.Module):
             observation_dim,
             history_horizon,
             latent_channel,
-            device,
+            device: str,
             dt=0.02,
             encoder_shape=None,
             decoder_shape=None,
@@ -58,7 +58,18 @@ class FLD(nn.Module):
         self.device = device
         self.dt = dt
 
+        """
+        Jason 2025-11-10:
+        构造一个 长度为 history_horizon 的向量，从：
+        - 负半长度时间窗口：-(history_horizon - 1) * dt / 2 到
+        - 正半长度时间窗口：(history_horizon - 1) * dt / 2 等间隔。
+        这种通常用于：
+        - 构建时间轴（如 [-0.5s, ..., 0.5s]）
+        - 计算历史窗口的时间偏移
+        - 构建 kernel、filter、GAE、motion tracking 里的对称时间窗口
+        """
         self.args = torch.linspace(-(history_horizon - 1) * self.dt / 2, (history_horizon - 1) * self.dt / 2, self.history_horizon, dtype=torch.float, device=self.device)
+
         self.freqs = torch.fft.rfftfreq(history_horizon, device=self.device)[1:] * history_horizon
         self.encoder_shape = encoder_shape if encoder_shape is not None else [int(self.input_channel / 3)]
         self.decoder_shape = decoder_shape if decoder_shape is not None else [int(self.input_channel / 3)]

@@ -116,15 +116,18 @@ class FLDOnPolicyRunner:
         # initialize writer
         if self.log_dir is not None and self.writer is None:
             self.writer = SummaryWriter(log_dir=self.log_dir, flush_secs=10)
+
         if init_at_random_ep_len:
             self.env.episode_length_buf = torch.randint_like(
                 self.env.episode_length_buf, high=int(self.env.max_episode_length)
             )
+
         self.plotter = Plotter()
         self.fig0, self.ax0 = plt.subplots(1, 3, subplot_kw=dict(projection='polar'))
         self.fig1, self.ax1 = plt.subplots(1, 3)
         self.fig2, self.ax2 = plt.subplots(1, 4)
         self.fig3, self.ax3 = plt.subplots(1, 2)
+
         obs = self.env.get_observations()
         privileged_obs = self.env.get_privileged_observations()
         critic_obs = privileged_obs if privileged_obs is not None else obs
@@ -182,16 +185,19 @@ class FLDOnPolicyRunner:
             _, performance_library = self.env.get_libraries()
             library_mean_performance = performance_library.mean()
             elite_buffer_size = self.env.get_elite_buffer_size()
+
             if self.task_sampler_class == "ALPGMMSampler":
                 knn_buffer_size = self.env.task_sampler.get_knn_buffer_size()
 
             if self.log_dir is not None:
                 self.log(locals())
+
             if it % self.save_interval == 0:
                 self.save(os.path.join(self.log_dir, "model_{}.pt".format(it)))
                 self.log_latent_params(it)
 
             self.check_task_sampler_curriculum_update()
+
             if it % self.env.cfg.task_sampler.check_update_interval == 0:
                 self.check_task_sampler_update()
 
