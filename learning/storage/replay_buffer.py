@@ -12,6 +12,14 @@ class ReplayBuffer:
         Arguments:
             buffer_size (int): maximum size of buffer
         """
+
+        print(
+            f"[ReplayBuffer] \n"
+            f"obs_dim: {obs_dim}\n"
+            f"obs_horizon: {obs_horizon}\n"
+            f"buffer_size: {buffer_size}\n"
+        )
+
         self.state_buf = torch.zeros(buffer_size, obs_horizon, obs_dim).to(device)
         self.buffer_size = buffer_size
         self.device = device
@@ -22,8 +30,25 @@ class ReplayBuffer:
     def insert(self, state_buf):
         """
         Add new states to memory.
+
+        这个函数向环形缓冲区（circular buffer）中插入连续的 state_buf 数据。
+        缓冲区大小有限，写满后会从头覆盖（overwrite old data）。
         """
 
+        print(
+            f"[ReplayBuffer] \n"
+            f"Inserting new states into ReplayBuffer...\n"
+            f"state_buf.shape: {state_buf.shape}\n"
+        )
+
+        """
+        参数与内部变量角色
+        state_buf: 形状为 (num_states, …) 的新数据
+        buffer_size: 环形缓冲区总长度
+        step: 当前写指针位置
+        state_buf[start_idx:end_idx]: 写入区域
+        num_samples: 缓冲区中当前累计的有效数据量
+        """
         num_states = state_buf.shape[0]
         start_idx = self.step
         end_idx = self.step + num_states
@@ -48,6 +73,12 @@ class ReplayBuffer:
         for _ in range(num_mini_batch):
             # 随机选择 mini_batch_size 个样本的索引
             sample_idxs = np.random.choice(self.num_samples, size=mini_batch_size)
+
+            print(
+                f"[ReplayBuffer] \n"
+                f"num_samples: {self.num_samples}\n"
+                f"sample_idxs: {sample_idxs}\n"
+            )
 
             """
             Jason 2025-11-10:

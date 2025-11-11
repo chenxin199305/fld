@@ -164,11 +164,28 @@ class FLD(nn.Module):
 
         Returns:
             tuple: Predicted dynamics, latent representation, reconstructed signal, and parameters.
+            [
+                pred_dynamics (torch.Tensor): 未来 k 步的重建结果 (k, batch_size, input_channel, history_horizon).
+                latent (torch.Tensor): 输入 x 的 latent 表示 (batch_size, latent_channel, history_horizon).
+                signal (torch.Tensor): t=0 时刻的重建信号 (batch_size, latent_channel, history_horizon).
+                params (list): 包含相位、频率、振幅、偏移的列表 (phase, frequency, amplitude, offset)，
+                                 每个元素形状均为 (batch_size, latent_channel)。
+            ]
         """
+
+        # (batch, input_channel, history_horizon)
+        # -> (batch, latent_channel, history_horizon)
         x = self.encoder(x)
         latent = x
+
+        # --------------------------------------------------
+        # Fourier Transform to get frequency, amplitude, offset
         frequency, amplitude, offset = self.fft(x)
-        phase = torch.zeros((x.size(0), self.latent_channel), device=self.device, dtype=torch.float)
+        phase = torch.zeros((x.size(0),
+                             self.latent_channel),
+                            device=self.device,
+                            dtype=torch.float)
+
         for i in range(self.latent_channel):
             phase_shift = self.phase_encoder[i](x[:, i, :])
             phase[:, i] = torch.atan2(phase_shift[:, 1], phase_shift[:, 0]) / (2 * torch.pi)
@@ -176,17 +193,30 @@ class FLD(nn.Module):
         # (batch_size, latent_channel)
         params = [phase, frequency, amplitude, offset]
 
+        # 构建未来 k 步的相位演化, 线性相位增长（harmonic oscillator 方程）
+        # φ(t + Δt) = φ(t) + f * dt * Δt
         # (k, batch_size, latent_channel)
         phase_dynamics = phase.unsqueeze(0) \
-                         + frequency.unsqueeze(0) * self.dt * torch.arange(0, k, device=self.device, dtype=torch.float, requires_grad=False).view(-1, 1, 1)
+                         + frequency.unsqueeze(0) * self.dt * torch.arange(0,
+                                                                           k,
+                                                                           device=self.device,
+                                                                           dtype=torch.float,
+                                                                           requires_grad=False
+                                                                           ).view(-1, 1, 1)
 
+        # 计算未来 k 步完整的时域 latent 波形 z
         # (k, batch_size, latent_channel, history_horizon)
-        z = amplitude.unsqueeze(-1).unsqueeze(0) * torch.sin(2 * torch.pi * ((frequency.unsqueeze(-1) * self.args).unsqueeze(0)
-                                                                             + phase_dynamics.unsqueeze(-1))) \
+        z = amplitude.unsqueeze(-1).unsqueeze(0) * torch.sin(
+            2 * torch.pi * (
+                    (frequency.unsqueeze(-1) * self.args).unsqueeze(0)
+                    + phase_dynamics.unsqueeze(-1))) \
             + offset.unsqueeze(-1).unsqueeze(0)
 
+        # t=0 时刻的重建, 这是 latent 的重建（类似 autoencoder 的 recon）。
         signal = z[0]
+        # --------------------------------------------------
 
+        # decoder 把 latent 动态变回原始空间
         # (k, batch_size, input_channel, history_horizon)
         pred_dynamics = self.decoder(z.flatten(0, 1)).view(k, -1, self.input_channel, self.history_horizon)
 
@@ -223,6 +253,7 @@ class FLD(nn.Module):
             torch.Tensor: Dynamics prediction error for each batch.
         """
         self.eval()
+
         state_transitions_sequence = torch.zeros(
             state_transitions.size(0),
             state_transitions.size(1) - self.history_horizon + 1,
@@ -232,12 +263,17 @@ class FLD(nn.Module):
             device=self.device,
             requires_grad=False
         )
+
         for step in range(state_transitions.size(1) - self.history_horizon + 1):
             state_transitions_sequence[:, step] = state_transitions[:, step:step + self.history_horizon, :]
+
         with torch.no_grad():
             pred_dynamics, _, _, _ = self.forward(state_transitions_sequence.flatten(0, 1).swapaxes(1, 2), k)
+
         pred_dynamics = pred_dynamics.swapaxes(2, 3).view(k, -1, state_transitions.size(1) - self.history_horizon + 1, self.history_horizon, state_transitions.size(2))
         error = torch.zeros(state_transitions.size(0), device=self.device, dtype=torch.float, requires_grad=False)
+
         for i in range(k):
             error[:] += torch.square((pred_dynamics[i, :, :state_transitions_sequence.size(1) - i] - state_transitions_sequence[:, i:])).mean(dim=(1, 2, 3))
+
         return error

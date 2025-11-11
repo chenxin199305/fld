@@ -79,6 +79,16 @@ class FLDTraining:
             self.observation_dim \
             = state_transitions_data.size()
 
+        print(
+            f"[FLDTraining] \n"
+            f"state_transitions_data: \n"
+            f"num_motions: {self.num_motions}\n"
+            f"num_trajs: {self.num_trajs}\n"
+            f"num_groups: {self.num_groups}\n"
+            f"num_steps: {self.num_steps}\n"
+            f"observation_dim: {self.observation_dim}\n"
+        )
+
         self.log_dir = log_dir
         self.latent_dim = latent_dim
         self.history_horizon = history_horizon
@@ -122,13 +132,22 @@ class FLDTraining:
 
         # Initialize replay and distribution buffers
         self.replay_buffer_size = self.num_motions * self.num_trajs * self.num_groups
-        self.state_transitions = ReplayBuffer(self.observation_dim, self.num_steps, self.replay_buffer_size, self.device)
+        self.state_transitions = ReplayBuffer(self.observation_dim,
+                                              self.num_steps,
+                                              self.replay_buffer_size,
+                                              self.device)
         self.state_transitions.insert(self.state_transitions_data.flatten(0, 2))
 
         distribution_buffer_size = 20000
-        self.distribution_frequency = DistributionBuffer(self.latent_dim, distribution_buffer_size, self.device)
-        self.distribution_amplitude = DistributionBuffer(self.latent_dim, distribution_buffer_size, self.device)
-        self.distribution_offset = DistributionBuffer(self.latent_dim, distribution_buffer_size, self.device)
+        self.distribution_frequency = DistributionBuffer(self.latent_dim,
+                                                         distribution_buffer_size,
+                                                         self.device)
+        self.distribution_amplitude = DistributionBuffer(self.latent_dim,
+                                                         distribution_buffer_size,
+                                                         self.device)
+        self.distribution_offset = DistributionBuffer(self.latent_dim,
+                                                      distribution_buffer_size,
+                                                      self.device)
 
         # Initialize plotting utilities
         self.plotter = Plotter()
@@ -199,28 +218,47 @@ class FLDTraining:
 
             for batch_state_transitions in state_transitions_data_generator:
 
+                # Do number of mini_batches updates per iteration
                 # batch_state_transitions : (mini_batch_size, num_steps, obs_dim)
 
-                # (mini_batch_size, forecast_horizon, obs_dim, history_horizon)
-                batch = batch_state_transitions.unfold(1, self.history_horizon, 1)
+                # batch: (mini_batch_size, forecast_horizon, obs_dim, history_horizon)
+                batch = batch_state_transitions.unfold(dimension=1,
+                                                       size=self.history_horizon,
+                                                       step=1)
+
+                # add noise to the input data
                 batch_noised = batch + torch.randn_like(batch, device=self.device) * self.noise_level
 
-                # (mini_batch_size, obs_dim, history_horizon)
+                # batch_noised: (mini_batch_size, obs_dim, history_horizon)
                 batch_input = batch_noised[:, 0, :, :]
+
+                print(
+                    f"[FLDTraining] \n"
+                    f"batch_state_transitions.shape: {batch_state_transitions.shape}\n"
+                    f"batch.shape: {batch.shape}\n"
+                    f"batch_noised.shape: {batch_noised.shape}\n"
+                    f"batch_input.shape: {batch_input.shape}\n"
+                )
 
                 # pred_dynamics: (forecast_horizon, mini_batch_size, obs_dim, history_horizon)
                 # latent: (mini_batch_size, latent_dim, history_horizon)
                 # signal: (mini_batch_size, latent_dim, history_horizon)
                 # params: 4-tuple of (phase, frequency, amplitude, offset) each of shape (mini_batch_size, latent_dim)
-                pred_dynamics, latent, signal, params = self.fld.forward(batch_input, k=self.forecast_horizon)
+                pred_dynamics, \
+                    latent, \
+                    signal, \
+                    params \
+                    = self.fld.forward(batch_input, k=self.forecast_horizon)
                 phase, frequency, amplitude, offset = params
 
                 # reconstruction loss
                 loss = 0
                 for i in range(self.forecast_horizon):
                     # compute loss for each step of forecast_horizon
-                    reconstruction_loss = self.compute_loss(pred_dynamics[i, :, :, :].swapaxes(-2, -1), batch.swapaxes(-2, -1)[:, i])
+                    reconstruction_loss = self.compute_loss(pred_dynamics[i, :, :, :].swapaxes(-2, -1),
+                                                            batch.swapaxes(-2, -1)[:, i])
                     loss += reconstruction_loss
+
                 mean_fld_loss += loss.item()
 
                 # Backpropagation and optimization step

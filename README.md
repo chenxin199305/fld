@@ -4,7 +4,7 @@ This repository provides the [Fourier Latent Dynamics (FLD)](https://arxiv.org/a
 This work demonstrates its representation and generation capability with a robotic motion tracking task on [MIT Humanoid](https://spectrum.ieee.org/mit-dynamic-acrobatic-humanoid-robot)
 using [NVIDIA Isaac Gym](https://developer.nvidia.com/isaac-gym).
 
-![fld](fld.png)
+![fld](docs/fld.png)
 
 **Paper**: [FLD: Fourier Latent Dynamics for Structured Motion Representation and Learning](https://arxiv.org/abs/2402.13820)  
 **Project website**: https://sites.google.com/view/iclr2024-fld/home
@@ -183,3 +183,7 @@ The current implementation is tested with `faiss-cpu` and `faiss-gpu` with `cuda
 The code is built upon the
 open-sourced [Periodic Autoencoder (PAE) Implementation](https://github.com/sebastianstarke/AI4Animation/tree/master/AI4Animation/SIGGRAPH_2022/PyTorch/PAE), [Isaac Gym Environments for Legged Robots](https://github.com/leggedrobotics/legged_gym) and
 the [PPO implementation](https://github.com/leggedrobotics/rsl_rl). We refer to the original repositories for more details.
+
+## Other information
+
+![img.png](docs/img.png)

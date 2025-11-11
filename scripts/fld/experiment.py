@@ -43,10 +43,14 @@ class FLDExperiment:
         and calculates the mean and standard deviation of the state transitions data.
 
         """
-        datasets_root = os.path.join(LEGGED_GYM_ROOT_DIR + "/resources/robots/mit_humanoid/datasets/misc")
+        datasets_root = os.path.join(LEGGED_GYM_ROOT_DIR
+                                     + "/resources/robots/mit_humanoid/datasets/misc")
+
         motion_data = os.listdir(datasets_root)
-        motion_name_set = [data.replace('motion_data_', '').replace('.pt', '')
-                           for data in motion_data if "combined" not in data and ".pt" in data]
+        motion_name_set = [
+            data.replace('motion_data_', '').replace('.pt', '')
+            for data in motion_data if "combined" not in data and ".pt" in data
+        ]
 
         # --------------------------------------------------
 
@@ -61,9 +65,10 @@ class FLDExperiment:
 
             print(
                 f"[FLDExperiment] "
-                f"Loaded motion {motion_name} "
+                f"Loaded motion {i}: "
+                f"name {motion_name}, "
                 f"with {loaded_num_trajs} trajectories, "
-                f"{loaded_num_steps} steps "
+                f"with {loaded_num_steps} steps, "
                 f"with {loaded_obs_dim} dimensions."
             )
 
@@ -74,7 +79,7 @@ class FLDExperiment:
 
         print(
             f"{YELLOW}{BOLD}"
-            f"[FLDExperiment] \n"
+            f"[FLDExperiment] "
             f"motion_data_collection.shape: {motion_data_collection.shape}"
             f"{RESET}"
         )
@@ -84,9 +89,11 @@ class FLDExperiment:
 
         print(
             f"{YELLOW}{BOLD}"
-            f"[FLDExperiment] \n"
-            f"state_transitions_mean: {self.state_transitions_mean}\n"
-            f"state_transitions_std: {self.state_transitions_std}\n"
+            f"[FLDExperiment] "
+            f"state_transitions_mean.shape: {self.state_transitions_mean.shape}"
+            f"\n"
+            f"[FLDExperiment] "
+            f"state_transitions_std.shape: {self.state_transitions_std.shape}"
             f"{RESET}"
         )
 
@@ -97,11 +104,60 @@ class FLDExperiment:
         # bootstrapping the window of history_horizon forward with forecast_horizon steps
         # num_groups denotes the number of such num_steps
 
-        # (num_motions, num_trajs, num_groups, num_steps, obs_dim)
-        motion_data_collection = motion_data_collection.unfold(2, self.history_horizon + self.forecast_horizon - 1, 1).swapaxes(-2, -1)
+        """
+        Jason 2025-11-11:
+        unfold 的作用是创建一个滑动窗口。
+        
+        这里的 dimension=2 表示在第2个维度上进行操作，也就是 traj_len 维度。
+        size=self.history_horizon + self.forecast_horizon - 1 表示窗口的大小。
+        step=1 表示窗口每次移动1个位置。
+        
+        经过 unfold 操作后，原本的 traj_len 维度会被拆分成两个维度：
+        一个是 num_groups，表示有多少个这样的窗口；
+        另一个是 num_steps，表示每个窗口内的时间步数。
+        最后通过 swapaxes(-2, -1) 将这两个新维度的位置交换，使得最终的维度顺序变为
+        (num_motions, num_trajs, num_groups, num_steps, obs_dim)。
+        这样处理后的数据可以更方便地用于后续的模型训练，特别是对于时间序列数据的处理。
+
+        具体来说，假设 history_horizon=51，forecast_horizon=50，那么
+        每个窗口的大小就是 51 + 50 - 1 = 100。
+        这样每个窗口包含了51帧的历史数据和50帧的未来数据（减去1是因为历史的最后一帧和未来的第一帧是重叠的）。
+        通过这种方式，可以生成多个这样的窗口，用于训练模型预测未来的状态。
+        """
+        # (num_motions, num_trajs, traj_len, obs_dim)
+        # -> unfold -> (num_motions, num_trajs, num_groups, obs_dim, num_steps)
+        # -> swapaxes -> (num_motions, num_trajs, num_groups, num_steps, obs_dim)
+        motion_data_collection = motion_data_collection.unfold(
+            dimension=2,
+            size=self.history_horizon + self.forecast_horizon - 1,
+            step=1)
+
+        print(
+            f"{YELLOW}{BOLD}"
+            f"[FLDExperiment] "
+            f"After unfold, motion_data_collection.shape: {motion_data_collection.shape}"
+            f"{RESET}"
+        )
+
+        motion_data_collection = motion_data_collection.swapaxes(-2, -1)
+
+        print(
+            f"{YELLOW}{BOLD}"
+            f"[FLDExperiment] "
+            f"After swapaxes, motion_data_collection.shape: {motion_data_collection.shape}"
+            f"{RESET}"
+        )
 
         # (num_motions, num_trajs, num_groups, num_steps, obs_dim)
-        self.state_transitions_data = (motion_data_collection - self.state_transitions_mean) / self.state_transitions_std
+        self.state_transitions_data = (motion_data_collection - self.state_transitions_mean) \
+                                      / self.state_transitions_std
+
+        print(
+            f"{YELLOW}{BOLD}"
+            f"[FLDExperiment] "
+            f"self.state_transitions_data.shape: {self.state_transitions_data.shape}"
+            f"{RESET}"
+        )
 
         # --------------------------------------------------
 
