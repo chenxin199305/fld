@@ -255,8 +255,12 @@ class FLDTraining:
                 loss = 0
                 for i in range(self.forecast_horizon):
                     # compute loss for each step of forecast_horizon
-                    reconstruction_loss = self.compute_loss(pred_dynamics[i, :, :, :].swapaxes(-2, -1),
-                                                            batch.swapaxes(-2, -1)[:, i])
+                    reconstruction_loss = self.compute_loss(
+                        # .swapaxes(-2, -1) 把 (obs_dim, history_horizon)
+                        # 换成 (history_horizon, obs_dim)，使得时间维在前。
+                        pred_dynamics[i, :, :, :].swapaxes(-2, -1),
+                        batch.swapaxes(-2, -1)[:, i],
+                    )
                     loss += reconstruction_loss
 
                 mean_fld_loss += loss.item()
@@ -286,46 +290,70 @@ class FLDTraining:
                     self.fld.eval()
 
                     plot_traj_index = 0
-                    self.plotter.plot_distribution(self.ax0[0], self.distribution_frequency.get_distribution(), title="Frequency Distribution")
-                    self.plotter.plot_distribution(self.ax0[1], self.distribution_amplitude.get_distribution(), title="Amplitude Distribution")
-                    self.plotter.plot_distribution(self.ax0[2], self.distribution_offset.get_distribution(), title="Offset Distribution")
-                    self.writer.add_figure("fld/param_distribution", self.fig0, it)
+
+                    self.plotter.plot_distribution(self.ax0[0],
+                                                   self.distribution_frequency.get_distribution(),
+                                                   title="Frequency Distribution")
+                    self.plotter.plot_distribution(self.ax0[1],
+                                                   self.distribution_amplitude.get_distribution(),
+                                                   title="Amplitude Distribution")
+                    self.plotter.plot_distribution(self.ax0[2],
+                                                   self.distribution_offset.get_distribution(),
+                                                   title="Offset Distribution")
+                    self.writer.add_figure("fld/param_distribution",
+                                           self.fig0,
+                                           it)
+
                     eval_manifold_collection = []
 
                     for i in range(self.num_motions):
                         eval_traj = self.state_transitions_data[i, 0, :, :self.history_horizon, :].swapaxes(1, 2)
                         pred_dynamics, latent, signal, params = self.fld(eval_traj)
-
                         pred = pred_dynamics[0]
-                        self.plotter.plot_curves(self.ax1[0], eval_traj[plot_traj_index], -1.0, 1.0, -5.0, 5.0,
-                                                 title="Motion Curves" + " " + str(self.fld.input_channel) + "x" + str(self.history_horizon), show_axes=False)
-                        self.plotter.plot_curves(self.ax1[1], latent[plot_traj_index], -1.0, 1.0, -2.0, 2.0,
-                                                 title="Latent Convolutional Embedding" + " " + str(self.latent_dim) + "x" + str(self.history_horizon), show_axes=False)
-                        self.plotter.plot_circles(self.ax1[2], params[0][plot_traj_index], params[2][plot_traj_index],
-                                                  title="Learned Phase Timing" + " " + str(self.latent_dim) + "x" + str(2), show_axes=False)
-                        self.plotter.plot_curves(self.ax1[3], signal[plot_traj_index], -1.0, 1.0, -2.0, 2.0,
-                                                 title="Latent Parametrized Signal" + " " + str(self.latent_dim) + "x" + str(self.history_horizon), show_axes=False)
-                        self.plotter.plot_curves(self.ax1[4], pred[plot_traj_index], -1.0, 1.0, -5.0, 5.0,
-                                                 title="Curve Reconstruction" + " " + str(self.fld.input_channel) + "x" + str(self.history_horizon), show_axes=False)
-                        self.plotter.plot_curves(self.ax1[5], torch.vstack((eval_traj[plot_traj_index].flatten(0, 1), pred[plot_traj_index].flatten(0, 1))), -1.0, 1.0, -5.0, 5.0,
-                                                 title="Curve Reconstruction (Flattened)" + " " + str(1) + "x" + str(self.fld.input_channel * self.history_horizon), show_axes=False)
-                        self.writer.add_figure(f"fld/reconstruction/motion_{i}", self.fig1, it)
+
+                        self.plotter.plot_curves(
+                            self.ax1[0], eval_traj[plot_traj_index], -1.0, 1.0, -5.0, 5.0,
+                            title="Motion Curves" + " " + str(self.fld.input_channel) + "x" + str(self.history_horizon), show_axes=False)
+                        self.plotter.plot_curves(
+                            self.ax1[1], latent[plot_traj_index], -1.0, 1.0, -2.0, 2.0,
+                            title="Latent Convolutional Embedding" + " " + str(self.latent_dim) + "x" + str(self.history_horizon), show_axes=False)
+                        self.plotter.plot_circles(
+                            self.ax1[2], params[0][plot_traj_index], params[2][plot_traj_index],
+                            title="Learned Phase Timing" + " " + str(self.latent_dim) + "x" + str(2), show_axes=False)
+                        self.plotter.plot_curves(
+                            self.ax1[3], signal[plot_traj_index], -1.0, 1.0, -2.0, 2.0,
+                            title="Latent Parametrized Signal" + " " + str(self.latent_dim) + "x" + str(self.history_horizon), show_axes=False)
+                        self.plotter.plot_curves(
+                            self.ax1[4], pred[plot_traj_index], -1.0, 1.0, -5.0, 5.0,
+                            title="Curve Reconstruction" + " " + str(self.fld.input_channel) + "x" + str(self.history_horizon), show_axes=False)
+                        self.plotter.plot_curves(
+                            self.ax1[5], torch.vstack((eval_traj[plot_traj_index].flatten(0, 1), pred[plot_traj_index].flatten(0, 1))), -1.0, 1.0, -5.0, 5.0,
+                            title="Curve Reconstruction (Flattened)" + " " + str(1) + "x" + str(self.fld.input_channel * self.history_horizon), show_axes=False)
+                        self.writer.add_figure(
+                            f"fld/reconstruction/motion_{i}", self.fig1, it)
 
                         for j in range(self.latent_dim):
                             phase = params[0][:, j]
                             frequency = params[1][:, j]
                             amplitude = params[2][:, j]
                             offset = params[3][:, j]
-                            self.plotter.plot_phase_1d(self.ax2[j, 0], phase, amplitude,
-                                                       title=("1D Phase Values" if j == 0 else None), show_axes=False)
-                            self.plotter.plot_phase_2d(self.ax2[j, 1], phase, amplitude,
-                                                       title=("2D Phase Vectors" if j == 0 else None), show_axes=False)
-                            self.plotter.plot_curves(self.ax2[j, 2], frequency.unsqueeze(0), -1.0, 1.0, 0.0, 4.0,
-                                                     title=("Frequencies" if j == 0 else None), show_axes=False)
-                            self.plotter.plot_curves(self.ax2[j, 3], amplitude.unsqueeze(0), -1.0, 1.0, 0.0, 1.0,
-                                                     title=("Amplitudes" if j == 0 else None), show_axes=False)
-                            self.plotter.plot_curves(self.ax2[j, 4], offset.unsqueeze(0), -1.0, 1.0, -1.0, 1.0,
-                                                     title=("Offsets" if j == 0 else None), show_axes=False)
+
+                            self.plotter.plot_phase_1d(
+                                self.ax2[j, 0], phase, amplitude,
+                                title=("1D Phase Values" if j == 0 else None), show_axes=False)
+                            self.plotter.plot_phase_2d(
+                                self.ax2[j, 1], phase, amplitude,
+                                title=("2D Phase Vectors" if j == 0 else None), show_axes=False)
+                            self.plotter.plot_curves(
+                                self.ax2[j, 2], frequency.unsqueeze(0), -1.0, 1.0, 0.0, 4.0,
+                                title=("Frequencies" if j == 0 else None), show_axes=False)
+                            self.plotter.plot_curves(
+                                self.ax2[j, 3], amplitude.unsqueeze(0), -1.0, 1.0, 0.0, 1.0,
+                                title=("Amplitudes" if j == 0 else None), show_axes=False)
+                            self.plotter.plot_curves(
+                                self.ax2[j, 4], offset.unsqueeze(0), -1.0, 1.0, -1.0, 1.0,
+                                title=("Offsets" if j == 0 else None), show_axes=False)
+
                         self.writer.add_figure(f"fld/channel_params/motion_{i}", self.fig2, it)
 
                         phase = params[0]
