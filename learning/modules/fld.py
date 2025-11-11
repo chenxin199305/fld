@@ -268,12 +268,27 @@ class FLD(nn.Module):
             state_transitions_sequence[:, step] = state_transitions[:, step:step + self.history_horizon, :]
 
         with torch.no_grad():
-            pred_dynamics, _, _, _ = self.forward(state_transitions_sequence.flatten(0, 1).swapaxes(1, 2), k)
+            pred_dynamics, _, _, _ = self.forward(
+                state_transitions_sequence.flatten(0, 1).swapaxes(1, 2), k
+            )
 
-        pred_dynamics = pred_dynamics.swapaxes(2, 3).view(k, -1, state_transitions.size(1) - self.history_horizon + 1, self.history_horizon, state_transitions.size(2))
-        error = torch.zeros(state_transitions.size(0), device=self.device, dtype=torch.float, requires_grad=False)
+        pred_dynamics = pred_dynamics.swapaxes(2, 3).view(
+            k,
+            -1,
+            state_transitions.size(1) - self.history_horizon + 1,
+            self.history_horizon,
+            state_transitions.size(2),
+        )
+        error = torch.zeros(
+            state_transitions.size(0),
+            device=self.device,
+            dtype=torch.float,
+            requires_grad=False,
+        )
 
         for i in range(k):
-            error[:] += torch.square((pred_dynamics[i, :, :state_transitions_sequence.size(1) - i] - state_transitions_sequence[:, i:])).mean(dim=(1, 2, 3))
+            error[:] += torch.square(
+                (pred_dynamics[i, :, :state_transitions_sequence.size(1) - i] - state_transitions_sequence[:, i:])
+            ).mean(dim=(1, 2, 3))
 
         return error

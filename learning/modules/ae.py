@@ -138,8 +138,7 @@ class AE(nn.Module):
         signal = x_recon  # corresponds to FLD's "signal"
 
         # Keep only the latent space in params
-        space = latent
-        params = [space]
+        params = [None, None, None, None]
 
         # For prediction, assume future k steps equal current reconstruction (AE does not predict dynamics)
         pred_dynamics = x_recon.unsqueeze(0).repeat(k, 1, 1, 1)
@@ -151,6 +150,7 @@ class AE(nn.Module):
         Dynamics error evaluation compatible with the FLD interface.
         """
         self.eval()
+
         state_transitions_sequence = torch.zeros(
             state_transitions.size(0),
             state_transitions.size(1) - self.history_horizon + 1,
@@ -160,12 +160,15 @@ class AE(nn.Module):
             device=self.device,
             requires_grad=False,
         )
+
         for step in range(state_transitions.size(1) - self.history_horizon + 1):
             state_transitions_sequence[:, step] = state_transitions[:, step:step + self.history_horizon, :]
+
         with torch.no_grad():
             pred_dynamics, _, _, _ = self.forward(
                 state_transitions_sequence.flatten(0, 1).swapaxes(1, 2), k
             )
+
         pred_dynamics = pred_dynamics.swapaxes(2, 3).view(
             k,
             -1,
@@ -173,17 +176,16 @@ class AE(nn.Module):
             self.history_horizon,
             state_transitions.size(2),
         )
-        error = torch.zeros(state_transitions.size(0), device=self.device, dtype=torch.float)
+        error = torch.zeros(
+            state_transitions.size(0),
+            device=self.device,
+            dtype=torch.float,
+            requires_grad=False,
+        )
+
         for i in range(k):
             error[:] += torch.square(
                 (pred_dynamics[i, :, :state_transitions_sequence.size(1) - i] - state_transitions_sequence[:, i:])
             ).mean(dim=(1, 2, 3))
-        return error
 
-    def vae_loss(self, recon_x, x, mu=None, logvar=None, beta=1.0):
-        """
-        Reconstruction loss only (AE). Kept the `vae_loss` name for compatibility.
-        Arguments `mu` and `logvar` are ignored for deterministic AE.
-        """
-        recon_loss = F.mse_loss(recon_x, x, reduction='mean')
-        return recon_loss
+        return error
