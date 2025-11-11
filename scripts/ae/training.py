@@ -242,10 +242,10 @@ class AETraining:
                     f"batch_input.shape: {batch_input.shape}\n"
                 )
 
-                # pred_dynamics: (forecast_horizon, mini_batch_size, obs_dim, history_horizon)
+                # predict: (forecast_horizon, mini_batch_size, obs_dim, history_horizon)
                 # latent: (mini_batch_size, latent_dim, history_horizon)
                 # signal: (mini_batch_size, latent_dim, history_horizon)
-                pred_dynamics, \
+                predict, \
                     latent, \
                     signal, \
                     = self.ae.forward(batch_input, k=self.forecast_horizon)
@@ -257,7 +257,7 @@ class AETraining:
                     reconstruction_loss = self.compute_loss(
                         # .swapaxes(-2, -1) 把 (obs_dim, history_horizon)
                         # 换成 (history_horizon, obs_dim)，使得时间维在前。
-                        pred_dynamics[i, :, :, :].swapaxes(-2, -1),
+                        predict[i, :, :, :].swapaxes(-2, -1),
                         batch.swapaxes(-2, -1)[:, i],
                     )
                     loss += reconstruction_loss
@@ -288,24 +288,43 @@ class AETraining:
 
                     for i in range(self.num_motions):
                         eval_traj = self.state_transitions_data[i, 0, :, :self.history_horizon, :].swapaxes(1, 2)
-                        pred_dynamics, latent, signal = self.ae(eval_traj)
+                        predict, latent, signal = self.ae(eval_traj)
+                        predict_current = predict[0]
 
-                        pred = pred_dynamics[0]
+                        print(
+                            f"[AETraining] \n"
+                            f"eval_traj.shape = {eval_traj.shape}\n"
+                            f"predict.shape = {predict.shape}\n"
+                            f"latent.shape = {latent.shape}\n"
+                            f"signal.shape = {signal.shape}\n"
+                            f"predict_current.shape = {predict_current.shape}\n"
+                        )
+
                         self.plotter.plot_curves(
-                            self.ax1[0], eval_traj[plot_traj_index], -1.0, 1.0, -5.0, 5.0,
-                            title="Motion Curves" + " " + str(self.ae.input_channel) + "x" + str(self.history_horizon), show_axes=False)
+                            self.ax1[0], eval_traj[plot_traj_index],
+                            xmin=-1.0, xmax=1.0, ymin=-5.0, ymax=5.0,
+                            title="Motion Curves" + " " + str(self.ae.input_channel) + "x" + str(self.history_horizon),
+                            show_axes=False)
                         self.plotter.plot_curves(
-                            self.ax1[1], latent[plot_traj_index], -1.0, 1.0, -2.0, 2.0,
-                            title="Latent Convolutional Embedding" + " " + str(self.latent_dim) + "x" + str(self.history_horizon), show_axes=False)
+                            self.ax1[1], latent[plot_traj_index],
+                            xmin=-1.0, xmax=1.0, ymin=-2.0, ymax=2.0,
+                            title="Latent Convolutional Embedding" + " " + str(self.latent_dim) + "x" + str(self.history_horizon),
+                            show_axes=False)
                         self.plotter.plot_curves(
-                            self.ax1[3], signal[plot_traj_index], -1.0, 1.0, -2.0, 2.0,
-                            title="Latent Parametrized Signal" + " " + str(self.latent_dim) + "x" + str(self.history_horizon), show_axes=False)
+                            self.ax1[3], signal[plot_traj_index],
+                            xmin=-1.0, xmax=1.0, ymin=-2.0, ymax=2.0,
+                            title="Latent Parametrized Signal" + " " + str(self.latent_dim) + "x" + str(self.history_horizon),
+                            show_axes=False)
                         self.plotter.plot_curves(
-                            self.ax1[4], pred[plot_traj_index], -1.0, 1.0, -5.0, 5.0,
-                            title="Curve Reconstruction" + " " + str(self.ae.input_channel) + "x" + str(self.history_horizon), show_axes=False)
+                            self.ax1[4], predict_current[plot_traj_index],
+                            xmin=-1.0, xmax=1.0, ymin=-5.0, ymax=5.0,
+                            title="Curve Reconstruction" + " " + str(self.ae.input_channel) + "x" + str(self.history_horizon),
+                            show_axes=False)
                         self.plotter.plot_curves(
-                            self.ax1[5], torch.vstack((eval_traj[plot_traj_index].flatten(0, 1), pred[plot_traj_index].flatten(0, 1))), -1.0, 1.0, -5.0, 5.0,
-                            title="Curve Reconstruction (Flattened)" + " " + str(1) + "x" + str(self.ae.input_channel * self.history_horizon), show_axes=False)
+                            self.ax1[5], torch.vstack((eval_traj[plot_traj_index].flatten(0, 1), predict_current[plot_traj_index].flatten(0, 1))),
+                            xmin=-1.0, xmax=1.0, ymin=-5.0, ymax=5.0,
+                            title="Curve Reconstruction (Flattened)" + " " + str(1) + "x" + str(self.ae.input_channel * self.history_horizon),
+                            show_axes=False)
                         self.writer.add_figure(
                             f"ae/reconstruction/motion_{i}", self.fig1, it)
 

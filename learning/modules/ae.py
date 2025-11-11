@@ -124,7 +124,7 @@ class AE(nn.Module):
             k: number of prediction steps (for interface consistency)
 
         Returns:
-            pred_dynamics, latent, signal, params
+            predict, latent, signal, params
 
         Notes:
             - `params` now contains only the latent space tensor (preserving interface).
@@ -138,9 +138,9 @@ class AE(nn.Module):
         signal = x_recon  # corresponds to FLD's "signal"
 
         # For prediction, assume future k steps equal current reconstruction (AE does not predict dynamics)
-        pred_dynamics = x_recon.unsqueeze(0).repeat(k, 1, 1, 1)
+        predict = x_recon.unsqueeze(0).repeat(k, 1, 1, 1)
 
-        return pred_dynamics, latent, signal
+        return predict, latent, signal
 
     def get_dynamics_error(self, state_transitions, k):
         """
@@ -162,11 +162,11 @@ class AE(nn.Module):
             state_transitions_sequence[:, step] = state_transitions[:, step:step + self.history_horizon, :]
 
         with torch.no_grad():
-            pred_dynamics, _, _, _ = self.forward(
+            predict, _, _, _ = self.forward(
                 state_transitions_sequence.flatten(0, 1).swapaxes(1, 2), k
             )
 
-        pred_dynamics = pred_dynamics.swapaxes(2, 3).view(
+        predict = predict.swapaxes(2, 3).view(
             k,
             -1,
             state_transitions.size(1) - self.history_horizon + 1,
@@ -182,7 +182,7 @@ class AE(nn.Module):
 
         for i in range(k):
             error[:] += torch.square(
-                (pred_dynamics[i, :, :state_transitions_sequence.size(1) - i] - state_transitions_sequence[:, i:])
+                (predict[i, :, :state_transitions_sequence.size(1) - i] - state_transitions_sequence[:, i:])
             ).mean(dim=(1, 2, 3))
 
         return error
