@@ -3,6 +3,12 @@ from scripts.fld.training import FLDTraining
 import os
 import torch
 
+RED = "\033[91m"
+YELLOW = "\033[93m"
+GREEN = "\033[92m"
+BOLD = "\033[1m"
+RESET = "\033[0m"
+
 
 class FLDExperiment:
     """
@@ -53,17 +59,36 @@ class FLDExperiment:
             motion_data = torch.load(motion_path, map_location=self.device)[:, :, self.dim_of_interest]
             loaded_num_trajs, loaded_num_steps, loaded_obs_dim = motion_data.size()
 
-            print(f"[Motion Loader] "
-                  f"Loaded motion {motion_name} with {loaded_num_trajs} trajectories, "
-                  f"{loaded_num_steps} steps with {loaded_obs_dim} dimensions.")
+            print(
+                f"[FLDExperiment] "
+                f"Loaded motion {motion_name} "
+                f"with {loaded_num_trajs} trajectories, "
+                f"{loaded_num_steps} steps "
+                f"with {loaded_obs_dim} dimensions."
+            )
 
             motion_data_collection.append(motion_data.unsqueeze(0))
 
         # (num_motions, num_trajs, traj_len, obs_dim)
         motion_data_collection = torch.cat(motion_data_collection, dim=0)
 
+        print(
+            f"{YELLOW}{BOLD}"
+            f"[FLDExperiment] \n"
+            f"motion_data_collection.shape: {motion_data_collection.shape}"
+            f"{RESET}"
+        )
+
         self.state_transitions_mean = motion_data_collection.flatten(0, 2).mean(dim=0)
         self.state_transitions_std = motion_data_collection.flatten(0, 2).std(dim=0) + 1e-6
+
+        print(
+            f"{YELLOW}{BOLD}"
+            f"[FLDExperiment] \n"
+            f"state_transitions_mean: {self.state_transitions_mean}\n"
+            f"state_transitions_std: {self.state_transitions_std}\n"
+            f"{RESET}"
+        )
 
         # --------------------------------------------------
 

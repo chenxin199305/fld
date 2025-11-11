@@ -161,10 +161,35 @@ class FLDTraining:
         Args:
             max_iterations (int, optional): The maximum number of training iterations. Defaults to 1000.
         """
-        print("[FLD] Training started.")
+        print("[FLDTraining] Training started.")
+
+        # reset the iterations information
         tot_iter = self.current_learning_iteration + max_iterations
+
+        # reset loss
         mean_fld_loss = 0
+
         for it in range(self.current_learning_iteration, tot_iter):
+
+            print(
+                f"it = {it}\n"
+                f"max_iterations = {max_iterations}\n"
+                f"current_learning_iteration = {self.current_learning_iteration}\n"
+                f"num_motions = {self.num_motions}\n"
+                f"num_trajs = {self.num_trajs}\n"
+                f"num_groups = {self.num_groups}\n"
+                f"num_mini_batches = {self.fld_num_mini_batches}\n"
+            )
+
+            """
+            Jason 2025-11-10:
+            把 self.num_motions * self.num_trajs * self.num_groups 分成 fld_num_mini_batches 份，
+            每一份的大小是 self.num_motions * self.num_trajs * self.num_groups // self.fld_num_mini_batches
+            这样做的目的是为了在每次迭代中，能够更好地利用数据进行训练，同时也能控制每个 mini-batch 的大小，避免内存溢出。
+            这种划分方式确保了每个 mini-batch 都包含足够多的数据样本，从而提高训练的稳定性和效果。
+            另外，这种划分方式也有助于模型更好地捕捉数据的多样性，因为每个 mini-batch 都来自于整个数据集。
+            综上所述，这种划分方式在实践中被证明是有效的，能够提升模型的训练效果和泛化能力。
+            """
             state_transitions_data_generator = self.state_transitions.feed_forward_generator(
                 self.fld_num_mini_batches,
                 self.num_motions * self.num_trajs * self.num_groups // self.fld_num_mini_batches
@@ -173,6 +198,9 @@ class FLDTraining:
             # --------------------------------------------------
 
             for batch_state_transitions in state_transitions_data_generator:
+
+                # batch_state_transitions : (mini_batch_size, num_steps, obs_dim)
+
                 # (mini_batch_size, forecast_horizon, obs_dim, history_horizon)
                 batch = batch_state_transitions.unfold(1, self.history_horizon, 1)
                 batch_noised = batch + torch.randn_like(batch, device=self.device) * self.noise_level
@@ -210,7 +238,8 @@ class FLDTraining:
             # --------------------------------------------------
 
             self.writer.add_scalar(f"fld/loss", mean_fld_loss, it)
-            print(f"[FLD] Training iteration {it}/{self.current_learning_iteration + max_iterations}.")
+
+            print(f"[FLDTraining] Training iteration {it}/{self.current_learning_iteration + max_iterations}.")
 
             if it % 50 == 0:
                 self.save(it)
@@ -280,7 +309,8 @@ class FLDTraining:
 
         self.current_learning_iteration += max_iterations
         self.save(self.current_learning_iteration)
-        print("[FLD] Training finished.")
+
+        print("[FLDTraining] Training finished.")
 
     def save(self, it):
         """
@@ -324,7 +354,8 @@ class FLDTraining:
             path (str): Path to the checkpoint file.
             load_optimizer (bool, optional): Whether to load the optimizer state. Defaults to True.
         """
-        print(f"[FLD] Loading model from: {path}.")
+        print(f"[FLDTraining] Loading model from: {path}.")
+
         loaded_dict = torch.load(path)
         self.fld.load_state_dict(loaded_dict["fld_state_dict"])
         if load_optimizer:
@@ -348,9 +379,13 @@ class FLDTraining:
         all_frequency = all_params[1]  # (num_motions * num_trajs * num_groups, latent_dim)
         all_amplitude = all_params[2]  # (num_motions * num_trajs * num_groups, latent_dim)
         all_offset = all_params[3]  # (num_motions * num_trajs * num_groups, latent_dim)
-        print("[FLD] GMM fitting started.")
+
+        print("[FLDTraining] GMM fitting started.")
+
         self.gmm.fit(torch.cat((all_frequency, all_amplitude, all_offset), dim=1))
-        print("[FLD] GMM fitting finished.")
+
+        print("[FLDTraining] GMM fitting finished.")
+
         mu, var = self.gmm.get_block_parameters(self.latent_dim)
         self.plotter.plot_gmm(self.ax4[0], all_frequency.view(self.num_motions, -1, self.latent_dim), mu[0], var[0], title="Frequency GMM")
         self.plotter.plot_gmm(self.ax4[1], all_amplitude.view(self.num_motions, -1, self.latent_dim), mu[1], var[1], title="Amplitude GMM")
