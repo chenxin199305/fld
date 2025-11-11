@@ -29,7 +29,7 @@ class AE(nn.Module):
             observation_dim,
             history_horizon,
             latent_channel,
-            device,
+            device: str,
             dt=0.02,
             encoder_shape=None,
             decoder_shape=None,
@@ -137,13 +137,10 @@ class AE(nn.Module):
         latent = z
         signal = x_recon  # corresponds to FLD's "signal"
 
-        # Keep only the latent space in params
-        params = [None, None, None, None]
-
         # For prediction, assume future k steps equal current reconstruction (AE does not predict dynamics)
         pred_dynamics = x_recon.unsqueeze(0).repeat(k, 1, 1, 1)
 
-        return pred_dynamics, latent, signal, params
+        return pred_dynamics, latent, signal
 
     def get_dynamics_error(self, state_transitions, k):
         """

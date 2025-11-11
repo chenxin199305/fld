@@ -164,7 +164,7 @@ class AEExperiment:
             latent_dim (int): The dimensionality of the latent space.
 
         """
-        vae_training = AETraining(
+        ae_training = AETraining(
             log_dir,
             latent_dim,
             self.history_horizon,
@@ -173,17 +173,17 @@ class AEExperiment:
             self.state_transitions_data,
             self.state_transitions_mean,
             self.state_transitions_std,
-            vae_encoder_shape=[64, 64],
-            vae_decoder_shape=[64, 64],
-            vae_learning_rate=0.0001,
-            vae_weight_decay=0.0005,
-            vae_num_mini_batches=10,
+            ae_encoder_shape=[64, 64],
+            ae_decoder_shape=[64, 64],
+            ae_learning_rate=0.0001,
+            ae_weight_decay=0.0005,
+            ae_num_mini_batches=10,
             device="cuda",
             loss_function="geometric",
             noise_level=0.1,
         )
-        vae_training.train(max_iterations=5000)
-        vae_training.fit_gmm(covariance_type="full")
+        ae_training.train(max_iterations=5000)
+        ae_training.fit_gmm(covariance_type="full")
 
 
 if __name__ == "__main__":
@@ -211,8 +211,8 @@ if __name__ == "__main__":
     latent_dim = 8
 
     device = "cuda"
-    log_dir_root = LEGGED_GYM_ROOT_DIR + "/logs/flat_mit_humanoid/vae/"
+    log_dir_root = LEGGED_GYM_ROOT_DIR + "/logs/flat_mit_humanoid/ae/"
     log_dir = log_dir_root + "misc"
-    vae_experiment = AEExperiment(state_idx_dict, history_horizon, forecast_horizon, device)
-    vae_experiment.prepare_data()
-    vae_experiment.train(log_dir, latent_dim)
+    ae_experiment = AEExperiment(state_idx_dict, history_horizon, forecast_horizon, device)
+    ae_experiment.prepare_data()
+    ae_experiment.train(log_dir, latent_dim)

@@ -43,11 +43,11 @@ class AETraining:
         state_transitions_data (torch.Tensor): The state transitions data.
         state_transitions_mean (torch.Tensor): The mean of the state transitions data.
         state_transitions_std (torch.Tensor): The standard deviation of the state transitions data.
-        vae_encoder_shape (list, optional): The shape of the AE encoder. Defaults to None.
-        vae_decoder_shape (list, optional): The shape of the AE decoder. Defaults to None.
-        vae_learning_rate (float, optional): The learning rate for AE optimization. Defaults to 0.0001.
-        vae_weight_decay (float, optional): The weight decay for AE optimization. Defaults to 0.0005.
-        vae_num_mini_batches (int, optional): The number of mini-batches for AE training. Defaults to 80.
+        ae_encoder_shape (list, optional): The shape of the AE encoder. Defaults to None.
+        ae_decoder_shape (list, optional): The shape of the AE decoder. Defaults to None.
+        ae_learning_rate (float, optional): The learning rate for AE optimization. Defaults to 0.0001.
+        ae_weight_decay (float, optional): The weight decay for AE optimization. Defaults to 0.0005.
+        ae_num_mini_batches (int, optional): The number of mini-batches for AE training. Defaults to 80.
         device (str, optional): The device to use for training. Defaults to "cuda".
         loss_function (str, optional): The loss function to use. Can be "mse" or "geometric". Defaults to "mse".
         noise_level (float, optional): The level of noise to add to the input data. Defaults to 0.0.
@@ -63,11 +63,11 @@ class AETraining:
                  state_transitions_data,
                  state_transitions_mean,
                  state_transitions_std,
-                 vae_encoder_shape=None,
-                 vae_decoder_shape=None,
-                 vae_learning_rate=0.0001,
-                 vae_weight_decay=0.0005,
-                 vae_num_mini_batches=80,
+                 ae_encoder_shape=None,
+                 ae_decoder_shape=None,
+                 ae_learning_rate=0.0001,
+                 ae_weight_decay=0.0005,
+                 ae_num_mini_batches=80,
                  device="cuda",
                  loss_function="mse",  # mse or geometric
                  noise_level=0.0,
@@ -103,7 +103,7 @@ class AETraining:
         self.state_transitions_data = state_transitions_data
         self.state_transitions_mean = state_transitions_mean
         self.state_transitions_std = state_transitions_std
-        self.vae_num_mini_batches = vae_num_mini_batches
+        self.ae_num_mini_batches = ae_num_mini_batches
         self.device = device
         self.loss_function = loss_function
         self.noise_level = noise_level
@@ -134,8 +134,8 @@ class AETraining:
         self.loss_scale *= torch.pow(self.loss_horizon_discount, torch.arange(self.history_horizon, device=self.device, dtype=torch.float, requires_grad=False)).view(1, -1, 1)
 
         # Initialize the AE model and optimizer
-        self.vae = AE(self.observation_dim, self.history_horizon, self.latent_dim, self.device, encoder_shape=vae_encoder_shape, decoder_shape=vae_decoder_shape)
-        self.vae_optimizer = optim.Adam(self.vae.parameters(), lr=vae_learning_rate, weight_decay=vae_weight_decay)
+        self.ae = AE(self.observation_dim, self.history_horizon, self.latent_dim, self.device, encoder_shape=ae_encoder_shape, decoder_shape=ae_decoder_shape)
+        self.ae_optimizer = optim.Adam(self.ae.parameters(), lr=ae_learning_rate, weight_decay=ae_weight_decay)
 
         # Initialize replay buffers
         self.replay_buffer_size = self.num_motions * self.num_trajs * self.num_groups
@@ -199,21 +199,21 @@ class AETraining:
                 f"num_motions = {self.num_motions}\n"
                 f"num_trajs = {self.num_trajs}\n"
                 f"num_groups = {self.num_groups}\n"
-                f"num_mini_batches = {self.vae_num_mini_batches}\n"
+                f"num_mini_batches = {self.ae_num_mini_batches}\n"
             )
 
             """
             Jason 2025-11-10:
-            把 self.num_motions * self.num_trajs * self.num_groups 分成 vae_num_mini_batches 份，
-            每一份的大小是 self.num_motions * self.num_trajs * self.num_groups // self.vae_num_mini_batches
+            把 self.num_motions * self.num_trajs * self.num_groups 分成 ae_num_mini_batches 份，
+            每一份的大小是 self.num_motions * self.num_trajs * self.num_groups // self.ae_num_mini_batches
             这样做的目的是为了在每次迭代中，能够更好地利用数据进行训练，同时也能控制每个 mini-batch 的大小，避免内存溢出。
             这种划分方式确保了每个 mini-batch 都包含足够多的数据样本，从而提高训练的稳定性和效果。
             另外，这种划分方式也有助于模型更好地捕捉数据的多样性，因为每个 mini-batch 都来自于整个数据集。
             综上所述，这种划分方式在实践中被证明是有效的，能够提升模型的训练效果和泛化能力。
             """
             state_transitions_data_generator = self.state_transitions.feed_forward_generator(
-                self.vae_num_mini_batches,
-                self.num_motions * self.num_trajs * self.num_groups // self.vae_num_mini_batches
+                self.ae_num_mini_batches,
+                self.num_motions * self.num_trajs * self.num_groups // self.ae_num_mini_batches
             )
 
             # --------------------------------------------------
@@ -245,12 +245,10 @@ class AETraining:
                 # pred_dynamics: (forecast_horizon, mini_batch_size, obs_dim, history_horizon)
                 # latent: (mini_batch_size, latent_dim, history_horizon)
                 # signal: (mini_batch_size, latent_dim, history_horizon)
-                # params: 4-tuple of (phase, frequency, amplitude, offset) each of shape (mini_batch_size, latent_dim)
                 pred_dynamics, \
                     latent, \
                     signal, \
-                    params \
-                    = self.vae.forward(batch_input, k=self.forecast_horizon)
+                    = self.ae.forward(batch_input, k=self.forecast_horizon)
 
                 # reconstruction loss
                 loss = 0
@@ -267,16 +265,16 @@ class AETraining:
                 mean_ae_loss += loss.item()
 
                 # Backpropagation and optimization step
-                self.vae_optimizer.zero_grad()
+                self.ae_optimizer.zero_grad()
                 loss.backward()
-                self.vae_optimizer.step()
+                self.ae_optimizer.step()
 
-            vae_num_updates = self.vae_num_mini_batches
-            mean_ae_loss /= vae_num_updates
+            ae_num_updates = self.ae_num_mini_batches
+            mean_ae_loss /= ae_num_updates
 
             # --------------------------------------------------
 
-            self.writer.add_scalar(f"vae/loss", mean_ae_loss, it)
+            self.writer.add_scalar(f"ae/loss", mean_ae_loss, it)
 
             print(f"[AETraining] Training iteration {it}/{self.current_learning_iteration + max_iterations}.")
 
@@ -284,75 +282,34 @@ class AETraining:
                 self.save(it)
 
                 with torch.no_grad():
-                    self.vae.eval()
+                    self.ae.eval()
 
                     plot_traj_index = 0
-                    eval_manifold_collection = []
 
                     for i in range(self.num_motions):
                         eval_traj = self.state_transitions_data[i, 0, :, :self.history_horizon, :].swapaxes(1, 2)
-                        pred_dynamics, latent, signal, params = self.vae(eval_traj)
+                        pred_dynamics, latent, signal = self.ae(eval_traj)
 
                         pred = pred_dynamics[0]
                         self.plotter.plot_curves(
                             self.ax1[0], eval_traj[plot_traj_index], -1.0, 1.0, -5.0, 5.0,
-                            title="Motion Curves" + " " + str(self.vae.input_channel) + "x" + str(self.history_horizon), show_axes=False)
+                            title="Motion Curves" + " " + str(self.ae.input_channel) + "x" + str(self.history_horizon), show_axes=False)
                         self.plotter.plot_curves(
                             self.ax1[1], latent[plot_traj_index], -1.0, 1.0, -2.0, 2.0,
                             title="Latent Convolutional Embedding" + " " + str(self.latent_dim) + "x" + str(self.history_horizon), show_axes=False)
-                        self.plotter.plot_circles(
-                            self.ax1[2], params[0][plot_traj_index], params[2][plot_traj_index],
-                            title="Learned Phase Timing" + " " + str(self.latent_dim) + "x" + str(2), show_axes=False)
                         self.plotter.plot_curves(
                             self.ax1[3], signal[plot_traj_index], -1.0, 1.0, -2.0, 2.0,
                             title="Latent Parametrized Signal" + " " + str(self.latent_dim) + "x" + str(self.history_horizon), show_axes=False)
                         self.plotter.plot_curves(
                             self.ax1[4], pred[plot_traj_index], -1.0, 1.0, -5.0, 5.0,
-                            title="Curve Reconstruction" + " " + str(self.vae.input_channel) + "x" + str(self.history_horizon), show_axes=False)
+                            title="Curve Reconstruction" + " " + str(self.ae.input_channel) + "x" + str(self.history_horizon), show_axes=False)
                         self.plotter.plot_curves(
                             self.ax1[5], torch.vstack((eval_traj[plot_traj_index].flatten(0, 1), pred[plot_traj_index].flatten(0, 1))), -1.0, 1.0, -5.0, 5.0,
-                            title="Curve Reconstruction (Flattened)" + " " + str(1) + "x" + str(self.vae.input_channel * self.history_horizon), show_axes=False)
+                            title="Curve Reconstruction (Flattened)" + " " + str(1) + "x" + str(self.ae.input_channel * self.history_horizon), show_axes=False)
                         self.writer.add_figure(
-                            f"vae/reconstruction/motion_{i}", self.fig1, it)
+                            f"ae/reconstruction/motion_{i}", self.fig1, it)
 
-                        for j in range(self.latent_dim):
-                            phase = params[0][:, j]
-                            frequency = params[1][:, j]
-                            amplitude = params[2][:, j]
-                            offset = params[3][:, j]
-
-                            self.plotter.plot_phase_1d(
-                                self.ax2[j, 0], phase, amplitude,
-                                title=("1D Phase Values" if j == 0 else None), show_axes=False)
-                            self.plotter.plot_phase_2d(
-                                self.ax2[j, 1], phase, amplitude,
-                                title=("2D Phase Vectors" if j == 0 else None), show_axes=False)
-                            self.plotter.plot_curves(
-                                self.ax2[j, 2], frequency.unsqueeze(0), -1.0, 1.0, 0.0, 4.0,
-                                title=("Frequencies" if j == 0 else None), show_axes=False)
-                            self.plotter.plot_curves(
-                                self.ax2[j, 3], amplitude.unsqueeze(0), -1.0, 1.0, 0.0, 1.0,
-                                title=("Amplitudes" if j == 0 else None), show_axes=False)
-                            self.plotter.plot_curves(
-                                self.ax2[j, 4], offset.unsqueeze(0), -1.0, 1.0, -1.0, 1.0,
-                                title=("Offsets" if j == 0 else None), show_axes=False)
-
-                        self.writer.add_figure(f"vae/channel_params/motion_{i}", self.fig2, it)
-
-                        phase = params[0]
-                        amplitude = params[2]
-                        manifold = torch.hstack(
-                            (
-                                amplitude * torch.sin(2.0 * torch.pi * phase),
-                                amplitude * torch.cos(2.0 * torch.pi * phase),
-                            )
-                        )
-                        eval_manifold_collection.append(manifold.cpu())
-
-                    self.plotter.plot_pca(self.ax3, eval_manifold_collection, "Phase Manifold (" + str(self.num_motions) + " Random Sequences)")
-                    self.writer.add_figure("vae/phase_manifold", self.fig3, it)
-
-                    self.vae.train()
+                    self.ae.train()
 
         # --------------------------------------------------
 
@@ -382,8 +339,8 @@ class AETraining:
         )
         torch.save(
             {
-                "vae_state_dict": self.vae.state_dict(),
-                "vae_optimizer_state_dict": self.vae_optimizer.state_dict(),
+                "ae_state_dict": self.ae.state_dict(),
+                "ae_optimizer_state_dict": self.ae_optimizer.state_dict(),
                 "iter": it,
             },
             self.log_dir + f"/model_{it}.pt"
@@ -400,9 +357,9 @@ class AETraining:
         print(f"[AETraining] Loading model from: {path}.")
 
         loaded_dict = torch.load(path)
-        self.vae.load_state_dict(loaded_dict["vae_state_dict"])
+        self.ae.load_state_dict(loaded_dict["ae_state_dict"])
         if load_optimizer:
-            self.vae_optimizer.load_state_dict(loaded_dict["vae_optimizer_state_dict"])
+            self.ae_optimizer.load_state_dict(loaded_dict["ae_optimizer_state_dict"])
         self.current_learning_iteration = loaded_dict["iter"]
 
     def fit_gmm(self, covariance_type="diag"):
@@ -417,8 +374,8 @@ class AETraining:
         self.gmm = GaussianMixture(self.num_motions, self.latent_dim * 3, device=self.device, covariance_type=covariance_type)
         all_state_transitions = self.state_transitions_data[:, :, :, :self.history_horizon, :].flatten(0, 2).swapaxes(1, 2)  # (num_motions * num_trajs * num_groups, obs_dim, history_horizon)
         with torch.no_grad():
-            self.vae.eval()
-            _, _, _, all_params = self.vae(all_state_transitions)
+            self.ae.eval()
+            _, _, _, all_params = self.ae(all_state_transitions)
         all_frequency = all_params[1]  # (num_motions * num_trajs * num_groups, latent_dim)
         all_amplitude = all_params[2]  # (num_motions * num_trajs * num_groups, latent_dim)
         all_offset = all_params[3]  # (num_motions * num_trajs * num_groups, latent_dim)
