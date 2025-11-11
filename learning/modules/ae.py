@@ -7,7 +7,7 @@ class AE(nn.Module):
     """
     AE
     ----------------
-    A deterministic autoencoder compatible with the FLD interface.
+    A deterministic autoencoder compatible with the AE interface.
     Inputs/outputs keep the same shapes as the previous VAE-based AE,
     but encoding is deterministic (no μ / logσ² or reparameterization).
 
@@ -119,8 +119,8 @@ class AE(nn.Module):
         """
         Decode latent vector to reconstructed signal.
         """
-        x = self.decoder(z)
-        return x
+        x_recon = self.decoder(z)
+        return x_recon
 
     def forward(self, x, k=1):
         """
@@ -140,18 +140,14 @@ class AE(nn.Module):
         z = self.encode(x)
         x_recon = self.decode(z)
 
-        # Maintain interface compatibility with FLD:
+        # Maintain interface compatibility with AE:
         latent = z
-        signal = x_recon  # corresponds to FLD's "signal"
 
-        # For prediction, assume future k steps equal current reconstruction (AE does not predict dynamics)
-        predict = x_recon.unsqueeze(0).repeat(k, 1, 1, 1)
-
-        return predict, latent, signal
+        return x_recon, latent
 
     def get_dynamics_error(self, state_transitions, k):
         """
-        Dynamics error evaluation compatible with the FLD interface.
+        Dynamics error evaluation compatible with the AE interface.
         """
         self.eval()
 

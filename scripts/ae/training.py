@@ -10,17 +10,15 @@ Dependencies:
 - Custom modules: AE, Plotter, GaussianMixture, ReplayBuffer, DistributionBuffer.
 """
 
-from learning.modules.ae import AE
-from learning.modules.plotter import Plotter
-from learning.modules.gmm import GaussianMixture
-from learning.storage.replay_buffer import ReplayBuffer
-
-import torch
-import torch.nn as nn
-import torch.optim as optim
 import matplotlib.pyplot as plt
-
+import torch
+import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
+
+from learning.modules.ae import AE
+from learning.modules.gmm import GaussianMixture
+from learning.modules.plotter import Plotter
+from learning.storage.replay_buffer import ReplayBuffer
 
 RED = "\033[91m"
 YELLOW = "\033[93m"
@@ -219,7 +217,6 @@ class AETraining:
             # --------------------------------------------------
 
             for batch_state_transitions in state_transitions_data_generator:
-
                 # Do number of mini_batches updates per iteration
                 # batch_state_transitions : (mini_batch_size, num_steps, obs_dim)
 
@@ -232,7 +229,13 @@ class AETraining:
                 batch_noised = batch + torch.randn_like(batch, device=self.device) * self.noise_level
 
                 # (mini_batch_size, obs_dim, history_horizon)
+                # [:, 0, :, :] 拿到的是 history_horizon 长度的输入数据（第一个窗口，不包含预测部分）
                 batch_input = batch_noised[:, 0, :, :]
+
+                # predict: (forecast_horizon, mini_batch_size, obs_dim, history_horizon)
+                # latent: (mini_batch_size, latent_dim, history_horizon)
+                # signal: (mini_batch_size, latent_dim, history_horizon)
+                predict, latent = self.ae.forward(batch_input, k=self.forecast_horizon)
 
                 print(
                     f"[AETraining] \n"
@@ -240,28 +243,15 @@ class AETraining:
                     f"batch.shape: {batch.shape}\n"
                     f"batch_noised.shape: {batch_noised.shape}\n"
                     f"batch_input.shape: {batch_input.shape}\n"
+                    f"predict.shape: {predict.shape}\n"
+                    f"latent.shape: {latent.shape}\n"
                 )
 
-                # predict: (forecast_horizon, mini_batch_size, obs_dim, history_horizon)
-                # latent: (mini_batch_size, latent_dim, history_horizon)
-                # signal: (mini_batch_size, latent_dim, history_horizon)
-                predict, \
-                    latent, \
-                    signal, \
-                    = self.ae.forward(batch_input, k=self.forecast_horizon)
-
                 # reconstruction loss
-                loss = 0
-                for i in range(self.forecast_horizon):
-                    # compute loss for each step of forecast_horizon
-                    reconstruction_loss = self.compute_loss(
-                        # .swapaxes(-2, -1) 把 (obs_dim, history_horizon)
-                        # 换成 (history_horizon, obs_dim)，使得时间维在前。
-                        predict[i, :, :, :].swapaxes(-2, -1),
-                        batch.swapaxes(-2, -1)[:, i],
-                    )
-                    loss += reconstruction_loss
-
+                loss = self.compute_loss(
+                    predict.swapaxes(-2, -1),
+                    batch_input.swapaxes(-2, -1)
+                )
                 mean_ae_loss += loss.item()
 
                 # Backpropagation and optimization step
@@ -288,7 +278,7 @@ class AETraining:
 
                     for i in range(self.num_motions):
                         eval_traj = self.state_transitions_data[i, 0, :, :self.history_horizon, :].swapaxes(1, 2)
-                        predict, latent, signal = self.ae(eval_traj)
+                        predict, latent = self.ae(eval_traj)
                         predict_current = predict[0]
 
                         print(
@@ -296,7 +286,6 @@ class AETraining:
                             f"eval_traj.shape = {eval_traj.shape}\n"
                             f"predict.shape = {predict.shape}\n"
                             f"latent.shape = {latent.shape}\n"
-                            f"signal.shape = {signal.shape}\n"
                             f"predict_current.shape = {predict_current.shape}\n"
                         )
 
@@ -309,11 +298,6 @@ class AETraining:
                             self.ax1[1], latent[plot_traj_index],
                             xmin=-1.0, xmax=1.0, ymin=-2.0, ymax=2.0,
                             title="Latent Convolutional Embedding" + " " + str(self.latent_dim) + "x" + str(self.history_horizon),
-                            show_axes=False)
-                        self.plotter.plot_curves(
-                            self.ax1[3], signal[plot_traj_index],
-                            xmin=-1.0, xmax=1.0, ymin=-2.0, ymax=2.0,
-                            title="Latent Parametrized Signal" + " " + str(self.latent_dim) + "x" + str(self.history_horizon),
                             show_axes=False)
                         self.plotter.plot_curves(
                             self.ax1[4], predict_current[plot_traj_index],
