@@ -7,8 +7,9 @@ class AE(nn.Module):
     """
     AE
     ----------------
-    一个与 FLD 类兼容的自编码器模型。
-    输入输出接口保持一致，但内部使用 AE 编码和采样机制，而非傅里叶分解。
+    A deterministic autoencoder compatible with the FLD interface.
+    Inputs/outputs keep the same shapes as the previous VAE-based AE,
+    but encoding is deterministic (no μ / logσ² or reparameterization).
 
     Attributes:
         input_channel (int): Number of input channels (observation dimensions).
@@ -16,12 +17,10 @@ class AE(nn.Module):
         latent_channel (int): Number of latent channels for encoding.
         device (torch.device): Device to run the model on (e.g., 'cpu' or 'cuda').
         dt (float): Time step between observations.
-        args (torch.Tensor): Time arguments for Fourier transformations.
-        freqs (torch.Tensor): Frequencies for Fourier transformations.
         encoder_shape (list): Shape of the encoder layers.
         decoder_shape (list): Shape of the decoder layers.
         encoder (nn.Sequential): Encoder network for feature extraction.
-        phase_encoder (nn.ModuleList): Phase encoder for latent dynamics.
+        fc_latent (nn.Linear): Linear layer mapping flattened encoder output to latent.
         decoder (nn.Sequential): Decoder network for reconstructing input signals.
     """
 
@@ -74,10 +73,9 @@ class AE(nn.Module):
             curr_in = hidden
         self.encoder = nn.Sequential(*encoder_layers).to(self.device)
 
-        # Flatten then map to latent μ, logσ²
+        # Flatten then map to deterministic latent vector
         latent_input_dim = curr_in * self.history_horizon
-        self.fc_mu = nn.Linear(latent_input_dim, latent_channel).to(self.device)
-        self.fc_logvar = nn.Linear(latent_input_dim, latent_channel).to(self.device)
+        self.fc_latent = nn.Linear(latent_input_dim, latent_channel).to(self.device)
 
         # --- Decoder ---
         decoder_input_dim = latent_channel
@@ -95,21 +93,18 @@ class AE(nn.Module):
 
     def encode(self, x):
         """
-        Encode input into latent mean and logvar.
+        Encode input deterministically into latent vector.
+
+        Args:
+            x (torch.Tensor): Input with shape (B, input_channel, history_horizon)
+
+        Returns:
+            torch.Tensor: Latent vector of shape (B, latent_channel)
         """
         h = self.encoder(x)
         h = torch.flatten(h, start_dim=1)
-        mu = self.fc_mu(h)
-        logvar = self.fc_logvar(h)
-        return mu, logvar
-
-    def reparameterize(self, mu, logvar):
-        """
-        Sample z via reparameterization trick.
-        """
-        std = torch.exp(0.5 * logvar)
-        eps = torch.randn_like(std)
-        return mu + eps * std
+        z = self.fc_latent(h)
+        return z
 
     def decode(self, z):
         """Decode latent vector to reconstructed signal."""
@@ -122,7 +117,7 @@ class AE(nn.Module):
 
     def forward(self, x, k=1):
         """
-        Forward pass of the AE model.
+        Forward pass of the deterministic AE model.
 
         Args:
             x: (B, input_channel, history_horizon)
@@ -130,33 +125,30 @@ class AE(nn.Module):
 
         Returns:
             pred_dynamics, latent, signal, params
+
+        Notes:
+            - `params` now contains only the latent space tensor (preserving interface).
+            - Frequency/amplitude/offset synthesis removed; only the latent space is kept.
         """
-        mu, logvar = self.encode(x)
-        z = self.reparameterize(mu, logvar)
+        z = self.encode(x)
         x_recon = self.decode(z)
 
-        # 保持接口一致
+        # Maintain interface compatibility with FLD:
         latent = z
-        signal = x_recon  # 对应 FLD 的“信号”
+        signal = x_recon  # corresponds to FLD's "signal"
 
-        # ====== 🔧 新增部分：将 AE 参数扩展成 FLD 格式 ======
-        # 这里我们没有真正的 phase / frequency / amplitude / offset，
-        # 所以造出四个形状匹配的张量以保持接口一致。
-        phase = mu
-        frequency = logvar
-        amplitude = torch.ones_like(mu, device=mu.device)
-        offset = torch.zeros_like(mu, device=mu.device)
+        # Keep only the latent space in params
+        space = latent
+        params = [space]
 
-        params = [phase, frequency, amplitude, offset]
-
-        # 对于预测部分，这里假设未来 k 步与当前重建相同（AE 不预测时序）
+        # For prediction, assume future k steps equal current reconstruction (AE does not predict dynamics)
         pred_dynamics = x_recon.unsqueeze(0).repeat(k, 1, 1, 1)
 
         return pred_dynamics, latent, signal, params
 
     def get_dynamics_error(self, state_transitions, k):
         """
-        与 FLD 接口兼容的动态误差评估。
+        Dynamics error evaluation compatible with the FLD interface.
         """
         self.eval()
         state_transitions_sequence = torch.zeros(
@@ -188,8 +180,10 @@ class AE(nn.Module):
             ).mean(dim=(1, 2, 3))
         return error
 
-    def vae_loss(self, recon_x, x, mu, logvar, beta=1.0):
-        """标准 AE 损失"""
+    def vae_loss(self, recon_x, x, mu=None, logvar=None, beta=1.0):
+        """
+        Reconstruction loss only (AE). Kept the `vae_loss` name for compatibility.
+        Arguments `mu` and `logvar` are ignored for deterministic AE.
+        """
         recon_loss = F.mse_loss(recon_x, x, reduction='mean')
-        kl = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
-        return recon_loss + beta * kl
+        return recon_loss
