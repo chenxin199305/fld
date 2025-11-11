@@ -9,6 +9,20 @@ class VAE(nn.Module):
     ----------------
     一个与 FLD 类兼容的变分自编码器模型。
     输入输出接口保持一致，但内部使用 VAE 编码和采样机制，而非傅里叶分解。
+
+    Attributes:
+        input_channel (int): Number of input channels (observation dimensions).
+        history_horizon (int): Length of the input time-series history.
+        latent_channel (int): Number of latent channels for encoding.
+        device (torch.device): Device to run the model on (e.g., 'cpu' or 'cuda').
+        dt (float): Time step between observations.
+        args (torch.Tensor): Time arguments for Fourier transformations.
+        freqs (torch.Tensor): Frequencies for Fourier transformations.
+        encoder_shape (list): Shape of the encoder layers.
+        decoder_shape (list): Shape of the decoder layers.
+        encoder (nn.Sequential): Encoder network for feature extraction.
+        phase_encoder (nn.ModuleList): Phase encoder for latent dynamics.
+        decoder (nn.Sequential): Decoder network for reconstructing input signals.
     """
 
     def __init__(
@@ -23,7 +37,17 @@ class VAE(nn.Module):
             **kwargs,
     ):
         """
+        Initializes the VAE model.
 
+        Args:
+            observation_dim (int): Number of input channels (observation dimensions).
+            history_horizon (int): Length of the input time-series history.
+            latent_channel (int): Number of latent channels for encoding.
+            device (torch.device): Device to run the model on (e.g., 'cpu' or 'cuda').
+            dt (float, optional): Time step between observations. Defaults to 0.02.
+            encoder_shape (list, optional): Shape of the encoder layers. Defaults to None.
+            decoder_shape (list, optional): Shape of the decoder layers. Defaults to None.
+            **kwargs: Additional arguments (ignored).
         """
         if kwargs:
             print("VAE.__init__ got unexpected arguments (ignored): "

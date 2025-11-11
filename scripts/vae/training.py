@@ -15,6 +15,7 @@ from learning.modules.plotter import Plotter
 from learning.modules.gmm import GaussianMixture
 from learning.storage.replay_buffer import ReplayBuffer
 from learning.storage.distribution_buffer import DistributionBuffer
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -79,6 +80,16 @@ class VAETraining:
             self.observation_dim \
             = state_transitions_data.size()
 
+        print(
+            f"[VAETraining] \n"
+            f"state_transitions_data: \n"
+            f"num_motions: {self.num_motions}\n"
+            f"num_trajs: {self.num_trajs}\n"
+            f"num_groups: {self.num_groups}\n"
+            f"num_steps: {self.num_steps}\n"
+            f"observation_dim: {self.observation_dim}\n"
+        )
+
         self.log_dir = log_dir
         self.latent_dim = latent_dim
         self.history_horizon = history_horizon
@@ -122,13 +133,22 @@ class VAETraining:
 
         # Initialize replay and distribution buffers
         self.replay_buffer_size = self.num_motions * self.num_trajs * self.num_groups
-        self.state_transitions = ReplayBuffer(self.observation_dim, self.num_steps, self.replay_buffer_size, self.device)
+        self.state_transitions = ReplayBuffer(self.observation_dim,
+                                              self.num_steps,
+                                              self.replay_buffer_size,
+                                              self.device)
         self.state_transitions.insert(self.state_transitions_data.flatten(0, 2))
 
         distribution_buffer_size = 20000
-        self.distribution_frequency = DistributionBuffer(self.latent_dim, distribution_buffer_size, self.device)
-        self.distribution_amplitude = DistributionBuffer(self.latent_dim, distribution_buffer_size, self.device)
-        self.distribution_offset = DistributionBuffer(self.latent_dim, distribution_buffer_size, self.device)
+        self.distribution_frequency = DistributionBuffer(self.latent_dim,
+                                                         distribution_buffer_size,
+                                                         self.device)
+        self.distribution_amplitude = DistributionBuffer(self.latent_dim,
+                                                         distribution_buffer_size,
+                                                         self.device)
+        self.distribution_offset = DistributionBuffer(self.latent_dim,
+                                                      distribution_buffer_size,
+                                                      self.device)
 
         # Initialize plotting utilities
         self.plotter = Plotter()
@@ -161,10 +181,35 @@ class VAETraining:
         Args:
             max_iterations (int, optional): The maximum number of training iterations. Defaults to 1000.
         """
-        print("[VAE] Training started.")
+        print("[VAETraining] Training started.")
+
+        # reset the iterations information
         tot_iter = self.current_learning_iteration + max_iterations
-        mean_vae_loss = 0
+
+        # reset loss
+        mean_fld_loss = 0
+
         for it in range(self.current_learning_iteration, tot_iter):
+
+            print(
+                f"it = {it}\n"
+                f"max_iterations = {max_iterations}\n"
+                f"current_learning_iteration = {self.current_learning_iteration}\n"
+                f"num_motions = {self.num_motions}\n"
+                f"num_trajs = {self.num_trajs}\n"
+                f"num_groups = {self.num_groups}\n"
+                f"num_mini_batches = {self.vae_num_mini_batches}\n"
+            )
+
+            """
+            Jason 2025-11-10:
+            把 self.num_motions * self.num_trajs * self.num_groups 分成 vae_num_mini_batches 份，
+            每一份的大小是 self.num_motions * self.num_trajs * self.num_groups // self.vae_num_mini_batches
+            这样做的目的是为了在每次迭代中，能够更好地利用数据进行训练，同时也能控制每个 mini-batch 的大小，避免内存溢出。
+            这种划分方式确保了每个 mini-batch 都包含足够多的数据样本，从而提高训练的稳定性和效果。
+            另外，这种划分方式也有助于模型更好地捕捉数据的多样性，因为每个 mini-batch 都来自于整个数据集。
+            综上所述，这种划分方式在实践中被证明是有效的，能够提升模型的训练效果和泛化能力。
+            """
             state_transitions_data_generator = self.state_transitions.feed_forward_generator(
                 self.vae_num_mini_batches,
                 self.num_motions * self.num_trajs * self.num_groups // self.vae_num_mini_batches
@@ -173,26 +218,52 @@ class VAETraining:
             # --------------------------------------------------
 
             for batch_state_transitions in state_transitions_data_generator:
-                # (mini_batch_size, forecast_horizon, obs_dim, history_horizon)
-                batch = batch_state_transitions.unfold(1, self.history_horizon, 1)
+
+                # Do number of mini_batches updates per iteration
+                # batch_state_transitions : (mini_batch_size, num_steps, obs_dim)
+
+                # batch: (mini_batch_size, forecast_horizon, obs_dim, history_horizon)
+                batch = batch_state_transitions.unfold(dimension=1,
+                                                       size=self.history_horizon,
+                                                       step=1)
+
+                # add noise to the input data
                 batch_noised = batch + torch.randn_like(batch, device=self.device) * self.noise_level
 
                 # (mini_batch_size, obs_dim, history_horizon)
                 batch_input = batch_noised[:, 0, :, :]
 
+                print(
+                    f"[FLDTraining] \n"
+                    f"batch_state_transitions.shape: {batch_state_transitions.shape}\n"
+                    f"batch.shape: {batch.shape}\n"
+                    f"batch_noised.shape: {batch_noised.shape}\n"
+                    f"batch_input.shape: {batch_input.shape}\n"
+                )
+
                 # pred_dynamics: (forecast_horizon, mini_batch_size, obs_dim, history_horizon)
                 # latent: (mini_batch_size, latent_dim, history_horizon)
                 # signal: (mini_batch_size, latent_dim, history_horizon)
                 # params: 4-tuple of (phase, frequency, amplitude, offset) each of shape (mini_batch_size, latent_dim)
-                pred_dynamics, latent, signal, params = self.vae.forward(batch_input, k=self.forecast_horizon)
+                pred_dynamics, \
+                    latent, \
+                    signal, \
+                    params \
+                    = self.vae.forward(batch_input, k=self.forecast_horizon)
                 phase, frequency, amplitude, offset = params
 
                 # reconstruction loss
                 loss = 0
                 for i in range(self.forecast_horizon):
                     # compute loss for each step of forecast_horizon
-                    reconstruction_loss = self.compute_loss(pred_dynamics[i, :, :, :].swapaxes(-2, -1), batch.swapaxes(-2, -1)[:, i])
+                    reconstruction_loss = self.compute_loss(
+                        # .swapaxes(-2, -1) 把 (obs_dim, history_horizon)
+                        # 换成 (history_horizon, obs_dim)，使得时间维在前。
+                        pred_dynamics[i, :, :, :].swapaxes(-2, -1),
+                        batch.swapaxes(-2, -1)[:, i],
+                    )
                     loss += reconstruction_loss
+
                 mean_vae_loss += loss.item()
 
                 # Backpropagation and optimization step
@@ -210,7 +281,8 @@ class VAETraining:
             # --------------------------------------------------
 
             self.writer.add_scalar(f"vae/loss", mean_vae_loss, it)
-            print(f"[VAE] Training iteration {it}/{self.current_learning_iteration + max_iterations}.")
+
+            print(f"[VAETraining] Training iteration {it}/{self.current_learning_iteration + max_iterations}.")
 
             if it % 50 == 0:
                 self.save(it)
@@ -230,35 +302,49 @@ class VAETraining:
                         pred_dynamics, latent, signal, params = self.vae(eval_traj)
 
                         pred = pred_dynamics[0]
-                        self.plotter.plot_curves(self.ax1[0], eval_traj[plot_traj_index], -1.0, 1.0, -5.0, 5.0,
-                                                 title="Motion Curves" + " " + str(self.vae.input_channel) + "x" + str(self.history_horizon), show_axes=False)
-                        self.plotter.plot_curves(self.ax1[1], latent[plot_traj_index], -1.0, 1.0, -2.0, 2.0,
-                                                 title="Latent Convolutional Embedding" + " " + str(self.latent_dim) + "x" + str(self.history_horizon), show_axes=False)
-                        self.plotter.plot_circles(self.ax1[2], params[0][plot_traj_index], params[2][plot_traj_index],
-                                                  title="Learned Phase Timing" + " " + str(self.latent_dim) + "x" + str(2), show_axes=False)
-                        self.plotter.plot_curves(self.ax1[3], signal[plot_traj_index], -1.0, 1.0, -2.0, 2.0,
-                                                 title="Latent Parametrized Signal" + " " + str(self.latent_dim) + "x" + str(self.history_horizon), show_axes=False)
-                        self.plotter.plot_curves(self.ax1[4], pred[plot_traj_index], -1.0, 1.0, -5.0, 5.0,
-                                                 title="Curve Reconstruction" + " " + str(self.vae.input_channel) + "x" + str(self.history_horizon), show_axes=False)
-                        self.plotter.plot_curves(self.ax1[5], torch.vstack((eval_traj[plot_traj_index].flatten(0, 1), pred[plot_traj_index].flatten(0, 1))), -1.0, 1.0, -5.0, 5.0,
-                                                 title="Curve Reconstruction (Flattened)" + " " + str(1) + "x" + str(self.vae.input_channel * self.history_horizon), show_axes=False)
-                        self.writer.add_figure(f"vae/reconstruction/motion_{i}", self.fig1, it)
+                        self.plotter.plot_curves(
+                            self.ax1[0], eval_traj[plot_traj_index], -1.0, 1.0, -5.0, 5.0,
+                            title="Motion Curves" + " " + str(self.vae.input_channel) + "x" + str(self.history_horizon), show_axes=False)
+                        self.plotter.plot_curves(
+                            self.ax1[1], latent[plot_traj_index], -1.0, 1.0, -2.0, 2.0,
+                            title="Latent Convolutional Embedding" + " " + str(self.latent_dim) + "x" + str(self.history_horizon), show_axes=False)
+                        self.plotter.plot_circles(
+                            self.ax1[2], params[0][plot_traj_index], params[2][plot_traj_index],
+                            title="Learned Phase Timing" + " " + str(self.latent_dim) + "x" + str(2), show_axes=False)
+                        self.plotter.plot_curves(
+                            self.ax1[3], signal[plot_traj_index], -1.0, 1.0, -2.0, 2.0,
+                            title="Latent Parametrized Signal" + " " + str(self.latent_dim) + "x" + str(self.history_horizon), show_axes=False)
+                        self.plotter.plot_curves(
+                            self.ax1[4], pred[plot_traj_index], -1.0, 1.0, -5.0, 5.0,
+                            title="Curve Reconstruction" + " " + str(self.vae.input_channel) + "x" + str(self.history_horizon), show_axes=False)
+                        self.plotter.plot_curves(
+                            self.ax1[5], torch.vstack((eval_traj[plot_traj_index].flatten(0, 1), pred[plot_traj_index].flatten(0, 1))), -1.0, 1.0, -5.0, 5.0,
+                            title="Curve Reconstruction (Flattened)" + " " + str(1) + "x" + str(self.vae.input_channel * self.history_horizon), show_axes=False)
+                        self.writer.add_figure(
+                            f"vae/reconstruction/motion_{i}", self.fig1, it)
 
                         for j in range(self.latent_dim):
                             phase = params[0][:, j]
                             frequency = params[1][:, j]
                             amplitude = params[2][:, j]
                             offset = params[3][:, j]
-                            self.plotter.plot_phase_1d(self.ax2[j, 0], phase, amplitude,
-                                                       title=("1D Phase Values" if j == 0 else None), show_axes=False)
-                            self.plotter.plot_phase_2d(self.ax2[j, 1], phase, amplitude,
-                                                       title=("2D Phase Vectors" if j == 0 else None), show_axes=False)
-                            self.plotter.plot_curves(self.ax2[j, 2], frequency.unsqueeze(0), -1.0, 1.0, 0.0, 4.0,
-                                                     title=("Frequencies" if j == 0 else None), show_axes=False)
-                            self.plotter.plot_curves(self.ax2[j, 3], amplitude.unsqueeze(0), -1.0, 1.0, 0.0, 1.0,
-                                                     title=("Amplitudes" if j == 0 else None), show_axes=False)
-                            self.plotter.plot_curves(self.ax2[j, 4], offset.unsqueeze(0), -1.0, 1.0, -1.0, 1.0,
-                                                     title=("Offsets" if j == 0 else None), show_axes=False)
+
+                            self.plotter.plot_phase_1d(
+                                self.ax2[j, 0], phase, amplitude,
+                                title=("1D Phase Values" if j == 0 else None), show_axes=False)
+                            self.plotter.plot_phase_2d(
+                                self.ax2[j, 1], phase, amplitude,
+                                title=("2D Phase Vectors" if j == 0 else None), show_axes=False)
+                            self.plotter.plot_curves(
+                                self.ax2[j, 2], frequency.unsqueeze(0), -1.0, 1.0, 0.0, 4.0,
+                                title=("Frequencies" if j == 0 else None), show_axes=False)
+                            self.plotter.plot_curves(
+                                self.ax2[j, 3], amplitude.unsqueeze(0), -1.0, 1.0, 0.0, 1.0,
+                                title=("Amplitudes" if j == 0 else None), show_axes=False)
+                            self.plotter.plot_curves(
+                                self.ax2[j, 4], offset.unsqueeze(0), -1.0, 1.0, -1.0, 1.0,
+                                title=("Offsets" if j == 0 else None), show_axes=False)
+
                         self.writer.add_figure(f"vae/channel_params/motion_{i}", self.fig2, it)
 
                         phase = params[0]
@@ -280,7 +366,8 @@ class VAETraining:
 
         self.current_learning_iteration += max_iterations
         self.save(self.current_learning_iteration)
-        print("[VAE] Training finished.")
+
+        print("[VAETraining] Training finished.")
 
     def save(self, it):
         """
@@ -324,7 +411,8 @@ class VAETraining:
             path (str): Path to the checkpoint file.
             load_optimizer (bool, optional): Whether to load the optimizer state. Defaults to True.
         """
-        print(f"[VAE] Loading model from: {path}.")
+        print(f"[VAETraining] Loading model from: {path}.")
+
         loaded_dict = torch.load(path)
         self.vae.load_state_dict(loaded_dict["vae_state_dict"])
         if load_optimizer:
@@ -348,9 +436,13 @@ class VAETraining:
         all_frequency = all_params[1]  # (num_motions * num_trajs * num_groups, latent_dim)
         all_amplitude = all_params[2]  # (num_motions * num_trajs * num_groups, latent_dim)
         all_offset = all_params[3]  # (num_motions * num_trajs * num_groups, latent_dim)
-        print("[VAE] GMM fitting started.")
+
+        print("[VAETraining] GMM fitting started.")
+
         self.gmm.fit(torch.cat((all_frequency, all_amplitude, all_offset), dim=1))
-        print("[VAE] GMM fitting finished.")
+
+        print("[VAETraining] GMM fitting finished.")
+
         mu, var = self.gmm.get_block_parameters(self.latent_dim)
         self.plotter.plot_gmm(self.ax4[0], all_frequency.view(self.num_motions, -1, self.latent_dim), mu[0], var[0], title="Frequency GMM")
         self.plotter.plot_gmm(self.ax4[1], all_amplitude.view(self.num_motions, -1, self.latent_dim), mu[1], var[1], title="Amplitude GMM")

@@ -3,6 +3,12 @@ from scripts.vae.training import VAETraining
 import os
 import torch
 
+RED = "\033[91m"
+YELLOW = "\033[93m"
+GREEN = "\033[92m"
+BOLD = "\033[1m"
+RESET = "\033[0m"
+
 
 class VAEExperiment:
     """
@@ -37,10 +43,13 @@ class VAEExperiment:
         and calculates the mean and standard deviation of the state transitions data.
 
         """
-        datasets_root = os.path.join(LEGGED_GYM_ROOT_DIR + "/resources/robots/mit_humanoid/datasets/misc")
+        datasets_root = os.path.join(LEGGED_GYM_ROOT_DIR
+                                     + "/resources/robots/mit_humanoid/datasets/misc")
         motion_data = os.listdir(datasets_root)
-        motion_name_set = [data.replace('motion_data_', '').replace('.pt', '')
-                           for data in motion_data if "combined" not in data and ".pt" in data]
+        motion_name_set = [
+            data.replace('motion_data_', '').replace('.pt', '')
+            for data in motion_data if "combined" not in data and ".pt" in data
+        ]
 
         # --------------------------------------------------
 
@@ -53,30 +62,95 @@ class VAEExperiment:
             motion_data = torch.load(motion_path, map_location=self.device)[:, :, self.dim_of_interest]
             loaded_num_trajs, loaded_num_steps, loaded_obs_dim = motion_data.size()
 
-            print(f"[Motion Loader] "
-                  f"Loaded motion {motion_name} with {loaded_num_trajs} trajectories, "
-                  f"{loaded_num_steps} steps with {loaded_obs_dim} dimensions.")
+            print(
+                f"[VAEExperiment] "
+                f"Loaded motion {i}: "
+                f"name {motion_name}, "
+                f"with {loaded_num_trajs} trajectories, "
+                f"with {loaded_num_steps} steps, "
+                f"with {loaded_obs_dim} dimensions."
+            )
 
             motion_data_collection.append(motion_data.unsqueeze(0))
 
         # (num_motions, num_trajs, traj_len, obs_dim)
         motion_data_collection = torch.cat(motion_data_collection, dim=0)
 
+        print(
+            f"{YELLOW}{BOLD}"
+            f"[VAEExperiment] "
+            f"motion_data_collection.shape: {motion_data_collection.shape}"
+            f"{RESET}"
+        )
+
         self.state_transitions_mean = motion_data_collection.flatten(0, 2).mean(dim=0)
         self.state_transitions_std = motion_data_collection.flatten(0, 2).std(dim=0) + 1e-6
 
+        print(
+            f"{YELLOW}{BOLD}"
+            f"[VAEExperiment] "
+            f"state_transitions_mean.shape: {self.state_transitions_mean.shape}"
+            f"\n"
+            f"[VAEExperiment] "
+            f"state_transitions_std.shape: {self.state_transitions_std.shape}"
+            f"{RESET}"
+        )
+
         # --------------------------------------------------
 
-        # Unfold the data to prepare for training
-        # num_steps denotes the trajectory length induced by
-        # bootstrapping the window of history_horizon forward with forecast_horizon steps
-        # num_groups denotes the number of such num_steps
+        """
+        Jason 2025-11-11:
+        unfold 的作用是创建一个滑动窗口。
 
-        # (num_motions, num_trajs, num_groups, num_steps, obs_dim)
-        motion_data_collection = motion_data_collection.unfold(2, self.history_horizon + self.forecast_horizon - 1, 1).swapaxes(-2, -1)
+        这里的 dimension=2 表示在第2个维度上进行操作，也就是 traj_len 维度。
+        size=self.history_horizon + self.forecast_horizon - 1 表示窗口的大小。
+        step=1 表示窗口每次移动1个位置。
+
+        经过 unfold 操作后，原本的 traj_len 维度会被拆分成两个维度：
+        一个是 num_groups，表示有多少个这样的窗口；
+        另一个是 num_steps，表示每个窗口内的时间步数。
+        最后通过 swapaxes(-2, -1) 将这两个新维度的位置交换，使得最终的维度顺序变为
+        (num_motions, num_trajs, num_groups, num_steps, obs_dim)。
+        这样处理后的数据可以更方便地用于后续的模型训练，特别是对于时间序列数据的处理。
+
+        具体来说，假设 history_horizon=51，forecast_horizon=50，那么
+        每个窗口的大小就是 51 + 50 - 1 = 100。
+        这样每个窗口包含了51帧的历史数据和50帧的未来数据（减去1是因为历史的最后一帧和未来的第一帧是重叠的）。
+        通过这种方式，可以生成多个这样的窗口，用于训练模型预测未来的状态。
+        """
+        # (num_motions, num_trajs, traj_len, obs_dim)
+        # -> unfold -> (num_motions, num_trajs, num_groups, obs_dim, num_steps)
+        # -> swapaxes -> (num_motions, num_trajs, num_groups, num_steps, obs_dim)
+        motion_data_collection = motion_data_collection.unfold(
+            dimension=2,
+            size=self.history_horizon + self.forecast_horizon - 1,
+            step=1)
+
+        print(
+            f"{YELLOW}{BOLD}"
+            f"[VAEExperiment] "
+            f"After unfold, motion_data_collection.shape: {motion_data_collection.shape}"
+            f"{RESET}"
+        )
+
+        motion_data_collection = motion_data_collection.swapaxes(-2, -1)
+
+        print(
+            f"{YELLOW}{BOLD}"
+            f"[VAEExperiment] "
+            f"After swapaxes, motion_data_collection.shape: {motion_data_collection.shape}"
+            f"{RESET}"
+        )
 
         # (num_motions, num_trajs, num_groups, num_steps, obs_dim)
         self.state_transitions_data = (motion_data_collection - self.state_transitions_mean) / self.state_transitions_std
+
+        print(
+            f"{YELLOW}{BOLD}"
+            f"[FLDExperiment] "
+            f"self.state_transitions_data.shape: {self.state_transitions_data.shape}"
+            f"{RESET}"
+        )
 
         # --------------------------------------------------
 
@@ -123,9 +197,18 @@ if __name__ == "__main__":
         "dof_pos_leg_r": [25, 26, 27, 28, 29],
         "dof_pos_arm_r": [30, 31, 32, 33],
     }
-    history_horizon = 51  # the window size of the input state transitions
+
+    """
+    Jason 2025-11-10:
+    这里估计是取了历史窗口51帧，然后预测未来50帧的状态转移。
+    51帧如果是以50Hz采样的话，大概是1秒钟的数据。
+    """
+    # the window size of the input state transitions
+    history_horizon = 51
+    # the autoregressive prediction steps while obeying the quasi-constant latent parameterization
+    forecast_horizon = 50
     latent_dim = 8
-    forecast_horizon = 50  # the autoregressive prediction steps while obeying the quasi-constant latent parameterization
+
     device = "cuda"
     log_dir_root = LEGGED_GYM_ROOT_DIR + "/logs/flat_mit_humanoid/vae/"
     log_dir = log_dir_root + "misc"
