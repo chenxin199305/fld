@@ -60,8 +60,8 @@ class AE(nn.Module):
         self.device = device
         self.dt = dt
 
-        self.encoder_shape = encoder_shape if encoder_shape is not None else [int(self.input_channel / 2)]
-        self.decoder_shape = decoder_shape if decoder_shape is not None else [int(self.input_channel / 2)]
+        self.encoder_shape = encoder_shape if encoder_shape is not None else [int(self.input_channel * 2)]
+        self.decoder_shape = decoder_shape if decoder_shape is not None else [int(self.input_channel * 2)]
 
         # --- Encoder ---
         encoder_layers = []
@@ -71,18 +71,12 @@ class AE(nn.Module):
             encoder_layers.append(nn.BatchNorm1d(hidden))
             encoder_layers.append(nn.ELU())
             curr_in = hidden
+        encoder_layers.append(nn.Conv1d(curr_in, self.latent_channel, 3, stride=1, padding=1))
         self.encoder = nn.Sequential(*encoder_layers).to(self.device)
 
-        # Flatten then map to deterministic latent vector
-        latent_input_dim = curr_in * self.history_horizon
-        self.fc_latent = nn.Linear(latent_input_dim, latent_channel).to(self.device)
-
         # --- Decoder ---
-        decoder_input_dim = latent_channel
-        self.fc_decode = nn.Linear(decoder_input_dim, curr_in * self.history_horizon).to(self.device)
-
         decoder_layers = []
-        curr_in = curr_in
+        curr_in = self.latent_channel
         for hidden in self.decoder_shape:
             decoder_layers.append(nn.Conv1d(curr_in, hidden, 3, stride=1, padding=1))
             decoder_layers.append(nn.BatchNorm1d(hidden))
@@ -90,6 +84,23 @@ class AE(nn.Module):
             curr_in = hidden
         decoder_layers.append(nn.Conv1d(curr_in, self.input_channel, 3, stride=1, padding=1))
         self.decoder = nn.Sequential(*decoder_layers).to(self.device)
+
+        # print model info
+        self.info()
+
+    def info(self):
+        """
+        Print model information.
+        """
+        print(f"AE Model Info:")
+        print(f"  Input Channel: {self.input_channel}")
+        print(f"  History Horizon: {self.history_horizon}")
+        print(f"  Latent Channel: {self.latent_channel}")
+        print(f"  Device: {self.device}")
+        print(f"  Encoder Shape: {self.encoder_shape}")
+        print(f"  Decoder Shape: {self.decoder_shape}")
+        print(f"  Encoder: {self.encoder}")
+        print(f"  Decoder: {self.decoder}")
 
     def encode(self, x):
         """
@@ -101,19 +112,15 @@ class AE(nn.Module):
         Returns:
             torch.Tensor: Latent vector of shape (B, latent_channel)
         """
-        h = self.encoder(x)
-        h = torch.flatten(h, start_dim=1)
-        z = self.fc_latent(h)
+        z = self.encoder(x)
         return z
 
     def decode(self, z):
-        """Decode latent vector to reconstructed signal."""
-        h = self.fc_decode(z)
-
-        # reshape back to (B, hidden_dim, T)
-        h = h.view(z.size(0), -1, self.history_horizon)
-        x_recon = self.decoder(h)
-        return x_recon
+        """
+        Decode latent vector to reconstructed signal.
+        """
+        x = self.decoder(z)
+        return x
 
     def forward(self, x, k=1):
         """

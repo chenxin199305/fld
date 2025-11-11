@@ -74,12 +74,6 @@ class ReplayBuffer:
             # 随机选择 mini_batch_size 个样本的索引
             sample_idxs = np.random.choice(self.num_samples, size=mini_batch_size)
 
-            print(
-                f"[ReplayBuffer] \n"
-                f"num_samples: {self.num_samples}\n"
-                f"sample_idxs: {sample_idxs}\n"
-            )
-
             """
             Jason 2025-11-10:
             所谓 yield, 就是一个生成器的意思。调用这个函数的时候，并不会立刻执行函数体内的代码，而是返回一个生成器对象。
