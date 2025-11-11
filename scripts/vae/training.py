@@ -23,6 +23,13 @@ import matplotlib.pyplot as plt
 
 from torch.utils.tensorboard import SummaryWriter
 
+RED = "\033[91m"
+YELLOW = "\033[93m"
+GREEN = "\033[92m"
+BLUE = "\033[94m"
+BOLD = "\033[1m"
+RESET = "\033[0m"
+
 
 class VAETraining:
     """
@@ -181,7 +188,12 @@ class VAETraining:
         Args:
             max_iterations (int, optional): The maximum number of training iterations. Defaults to 1000.
         """
-        print("[VAETraining] Training started.")
+        print(
+            f"{GREEN}{BOLD}"
+            f"[VAETraining] "
+            f"Training started."
+            f"{RESET}"
+        )
 
         # reset the iterations information
         tot_iter = self.current_learning_iteration + max_iterations
@@ -367,7 +379,12 @@ class VAETraining:
         self.current_learning_iteration += max_iterations
         self.save(self.current_learning_iteration)
 
-        print("[VAETraining] Training finished.")
+        print(
+            f"{GREEN}{BOLD}"
+            f"[VAETraining] "
+            f"Training finished."
+            f"{RESET}"
+        )
 
     def save(self, it):
         """

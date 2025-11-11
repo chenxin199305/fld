@@ -6,6 +6,7 @@ import torch
 RED = "\033[91m"
 YELLOW = "\033[93m"
 GREEN = "\033[92m"
+BLUE = "\033[94m"
 BOLD = "\033[1m"
 RESET = "\033[0m"
 
@@ -147,7 +148,7 @@ class AEExperiment:
 
         print(
             f"{YELLOW}{BOLD}"
-            f"[FLDExperiment] "
+            f"[AEExperiment] "
             f"self.state_transitions_data.shape: {self.state_transitions_data.shape}"
             f"{RESET}"
         )

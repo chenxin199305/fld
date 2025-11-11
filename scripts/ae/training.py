@@ -14,7 +14,6 @@ from learning.modules.ae import AE
 from learning.modules.plotter import Plotter
 from learning.modules.gmm import GaussianMixture
 from learning.storage.replay_buffer import ReplayBuffer
-from learning.storage.distribution_buffer import DistributionBuffer
 
 import torch
 import torch.nn as nn
@@ -22,6 +21,13 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 
 from torch.utils.tensorboard import SummaryWriter
+
+RED = "\033[91m"
+YELLOW = "\033[93m"
+GREEN = "\033[92m"
+BLUE = "\033[94m"
+BOLD = "\033[1m"
+RESET = "\033[0m"
 
 
 class AETraining:
@@ -131,24 +137,13 @@ class AETraining:
         self.vae = AE(self.observation_dim, self.history_horizon, self.latent_dim, self.device, encoder_shape=vae_encoder_shape, decoder_shape=vae_decoder_shape)
         self.vae_optimizer = optim.Adam(self.vae.parameters(), lr=vae_learning_rate, weight_decay=vae_weight_decay)
 
-        # Initialize replay and distribution buffers
+        # Initialize replay buffers
         self.replay_buffer_size = self.num_motions * self.num_trajs * self.num_groups
         self.state_transitions = ReplayBuffer(self.observation_dim,
                                               self.num_steps,
                                               self.replay_buffer_size,
                                               self.device)
         self.state_transitions.insert(self.state_transitions_data.flatten(0, 2))
-
-        distribution_buffer_size = 20000
-        self.distribution_frequency = DistributionBuffer(self.latent_dim,
-                                                         distribution_buffer_size,
-                                                         self.device)
-        self.distribution_amplitude = DistributionBuffer(self.latent_dim,
-                                                         distribution_buffer_size,
-                                                         self.device)
-        self.distribution_offset = DistributionBuffer(self.latent_dim,
-                                                      distribution_buffer_size,
-                                                      self.device)
 
         # Initialize plotting utilities
         self.plotter = Plotter()
@@ -181,17 +176,23 @@ class AETraining:
         Args:
             max_iterations (int, optional): The maximum number of training iterations. Defaults to 1000.
         """
-        print("[AETraining] Training started.")
+        print(
+            f"{GREEN}{BOLD}"
+            f"[AETraining] "
+            f"Training started."
+            f"{RESET}"
+        )
 
         # reset the iterations information
         tot_iter = self.current_learning_iteration + max_iterations
 
         # reset loss
-        mean_fld_loss = 0
+        mean_ae_loss = 0
 
         for it in range(self.current_learning_iteration, tot_iter):
 
             print(
+                f"[AETraining] \n"
                 f"it = {it}\n"
                 f"max_iterations = {max_iterations}\n"
                 f"current_learning_iteration = {self.current_learning_iteration}\n"
@@ -234,7 +235,7 @@ class AETraining:
                 batch_input = batch_noised[:, 0, :, :]
 
                 print(
-                    f"[FLDTraining] \n"
+                    f"[AETraining] \n"
                     f"batch_state_transitions.shape: {batch_state_transitions.shape}\n"
                     f"batch.shape: {batch.shape}\n"
                     f"batch_noised.shape: {batch_noised.shape}\n"
@@ -250,7 +251,6 @@ class AETraining:
                     signal, \
                     params \
                     = self.vae.forward(batch_input, k=self.forecast_horizon)
-                phase, frequency, amplitude, offset = params
 
                 # reconstruction loss
                 loss = 0
@@ -264,23 +264,19 @@ class AETraining:
                     )
                     loss += reconstruction_loss
 
-                mean_vae_loss += loss.item()
+                mean_ae_loss += loss.item()
 
                 # Backpropagation and optimization step
                 self.vae_optimizer.zero_grad()
                 loss.backward()
                 self.vae_optimizer.step()
 
-                self.distribution_frequency.insert(frequency.detach())
-                self.distribution_amplitude.insert(amplitude.detach())
-                self.distribution_offset.insert(offset.detach())
-
             vae_num_updates = self.vae_num_mini_batches
-            mean_vae_loss /= vae_num_updates
+            mean_ae_loss /= vae_num_updates
 
             # --------------------------------------------------
 
-            self.writer.add_scalar(f"vae/loss", mean_vae_loss, it)
+            self.writer.add_scalar(f"vae/loss", mean_ae_loss, it)
 
             print(f"[AETraining] Training iteration {it}/{self.current_learning_iteration + max_iterations}.")
 
@@ -291,10 +287,6 @@ class AETraining:
                     self.vae.eval()
 
                     plot_traj_index = 0
-                    self.plotter.plot_distribution(self.ax0[0], self.distribution_frequency.get_distribution(), title="Frequency Distribution")
-                    self.plotter.plot_distribution(self.ax0[1], self.distribution_amplitude.get_distribution(), title="Amplitude Distribution")
-                    self.plotter.plot_distribution(self.ax0[2], self.distribution_offset.get_distribution(), title="Offset Distribution")
-                    self.writer.add_figure("vae/param_distribution", self.fig0, it)
                     eval_manifold_collection = []
 
                     for i in range(self.num_motions):
@@ -367,7 +359,12 @@ class AETraining:
         self.current_learning_iteration += max_iterations
         self.save(self.current_learning_iteration)
 
-        print("[AETraining] Training finished.")
+        print(
+            f"{GREEN}{BOLD}"
+            f"[AETraining] "
+            f"Training finished."
+            f"{RESET}"
+        )
 
     def save(self, it):
         """
@@ -376,21 +373,10 @@ class AETraining:
         Args:
             it (int): Current training iteration.
         """
-        latent_parameterization = torch.cat(
-            (
-                self.distribution_frequency.get_distribution(),
-                self.distribution_amplitude.get_distribution(),
-                self.distribution_offset.get_distribution(),
-            ), dim=1
-        )  # (distribution_buffer_size, latent_dim * 3)
         torch.save(
             {
                 "state_transitions_mean": self.state_transitions_mean,
                 "state_transitions_std": self.state_transitions_std,
-                "latent_param_max": latent_parameterization.max(dim=0)[0],
-                "latent_param_min": latent_parameterization.min(dim=0)[0],
-                "latent_param_mean": latent_parameterization.mean(dim=0),
-                "latent_param_std": latent_parameterization.std(dim=0),
             },
             self.log_dir + f"/statistics.pt"
         )

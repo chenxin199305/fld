@@ -23,6 +23,13 @@ import matplotlib.pyplot as plt
 
 from torch.utils.tensorboard import SummaryWriter
 
+RED = "\033[91m"
+YELLOW = "\033[93m"
+GREEN = "\033[92m"
+BLUE = "\033[94m"
+BOLD = "\033[1m"
+RESET = "\033[0m"
+
 
 class FLDTraining:
     """
