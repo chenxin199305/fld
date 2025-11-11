@@ -15,6 +15,7 @@ from learning.modules.plotter import Plotter
 from learning.modules.gmm import GaussianMixture
 from learning.storage.replay_buffer import ReplayBuffer
 from learning.storage.distribution_buffer import DistributionBuffer
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -284,7 +285,7 @@ class FLDTraining:
             print(f"[FLDTraining] Training iteration {it}/{self.current_learning_iteration + max_iterations}.")
 
             if it % 50 == 0:
-                self.save(it)
+                self.save(iteration=it)
 
                 with torch.no_grad():
                     self.fld.eval()
@@ -374,16 +375,16 @@ class FLDTraining:
         # --------------------------------------------------
 
         self.current_learning_iteration += max_iterations
-        self.save(self.current_learning_iteration)
+        self.save(iteration=self.current_learning_iteration)
 
         print("[FLDTraining] Training finished.")
 
-    def save(self, it):
+    def save(self, iteration):
         """
         Save the model and training statistics to disk.
 
         Args:
-            it (int): Current training iteration.
+            iteration (int): Current training iteration.
         """
         latent_parameterization = torch.cat(
             (
@@ -407,9 +408,9 @@ class FLDTraining:
             {
                 "fld_state_dict": self.fld.state_dict(),
                 "fld_optimizer_state_dict": self.fld_optimizer.state_dict(),
-                "iter": it,
+                "iteration": iteration,
             },
-            self.log_dir + f"/model_{it}.pt"
+            self.log_dir + f"/model_{iteration}.pt"
         )
 
     def load(self, path, load_optimizer=True):
